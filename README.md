@@ -4,11 +4,19 @@
 
 An independently maintained Antigravity subscription provider for Pi. It adapts the official **agy CLI HTTP protocol** without running the CLI, an ACP bridge, or another agent.
 
-**Status: development implementation, installed locally with explicit authorization; not published.** The package remains `private: true`. Tested against Pi **1.5.2** with synthetic HTTP responses; fresh browser login and live provider acceptance still require separate authorization.
+**Status: public-source chat provider, installed and user-tested locally.** Tested against Pi **1.5.2** with synthetic HTTP responses and bounded live diagnostics; see the acceptance limits below.
 
 ## Installation
 
-Requires Node.js >= 22.19.0 and the Pi 1.5.2 provider APIs used by this implementation. The npm package is not published yet; install from GitHub:
+Requires Node.js >= 22.19.0 and the Pi 1.5.2 provider APIs used by this implementation.
+
+From npm:
+
+```sh
+pi install npm:@specode/pi-antigravity
+```
+
+Or from GitHub:
 
 ```sh
 pi install git:github.com/specode/pi-antigravity
@@ -35,9 +43,9 @@ npm run check
 
 The extension entry is `src/index.ts`. Do not load it alongside another provider registered as `antigravity`. Switching your installed provider, live account testing, and publishing are separate steps—not performed by development tests.
 
-## Release preparation
+## Publishing
 
-GitHub Actions validates pushes and pull requests. The `npm-publish.yml` release workflow uses npm Trusted Publishing (OIDC), but skips publishing while `package.json` remains `private: true`. A future npm release requires explicit authorization, removing that guard, and configuring the repository/workflow as a trusted publisher in npm. No long-lived npm token is used. Repository initialization does not create a release or publish npm.
+The scoped npm package is configured for public access. GitHub Actions validates pushes and pull requests. The first bootstrap publication requires an authenticated npm maintainer; afterward, configure this repository and `npm-publish.yml` as an npm trusted publisher for future GitHub Release publications through OIDC. The workflow requires no long-lived npm token. Publishing and creating releases are external operations and require explicit authorization.
 
 ## Request flow
 

@@ -1,5 +1,5 @@
 # Publish through npm Trusted Publishing (OIDC), never a long-lived npm token.
-# Configure this repository/workflow in npm before the first authorized release.
+# Configure this repository/workflow in npm after the first public bootstrap publish.
 name: Node.js Package
 
 on:
@@ -12,8 +12,6 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    outputs:
-      publishable: ${{ steps.package.outputs.publishable }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -22,19 +20,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - name: Check publication eligibility
-        id: package
-        run: |
-          node --input-type=module <<'JS'
-          import { appendFileSync, readFileSync } from 'node:fs';
-          const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
-          appendFileSync(process.env.GITHUB_OUTPUT, `publishable=${manifest.private !== true}\n`);
-          if (manifest.private === true) console.log('Publication disabled: package.json remains private.');
-          JS
 
   publish-npm:
     needs: validate
-    if: needs.validate.outputs.publishable == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

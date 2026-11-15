@@ -4,11 +4,19 @@
 
 独立维护的 Pi Antigravity 订阅 provider。适配官方 **agy CLI 的 HTTP 协议**，运行时不启动官方 CLI、ACP bridge 或另一套 agent。
 
-**状态：开发实现，已获明确授权安装到本机；尚未发布。** 保留 `private: true`。基于 Pi **1.5.2** 和合成 HTTP 响应测试；首次浏览器登录和真实 provider 验收仍须单独授权。
+**状态：公开源码的聊天 provider，已安装到本机并获用户实测确认。** 基于 Pi **1.5.2** 完成合成 HTTP 测试和受限真实对照；验收边界见下文。
 
 ## 安装
 
-需要 Node.js >= 22.19.0，以及本实现使用的 Pi 1.5.2 provider API。npm 包尚未发布，请从 GitHub 安装：
+需要 Node.js >= 22.19.0，以及本实现使用的 Pi 1.5.2 provider API。
+
+从 npm 安装：
+
+```sh
+pi install npm:@specode/pi-antigravity
+```
+
+也可以从 GitHub 安装：
 
 ```sh
 pi install git:github.com/specode/pi-antigravity
@@ -35,9 +43,9 @@ npm run check
 
 扩展入口为 `src/index.ts`。不要与另一个注册 `antigravity` 的 provider 同时加载。切换用户安装、真实账号测试和发布均为独立步骤，不会由开发测试执行。
 
-## 发布准备
+## 发布
 
-GitHub Actions 会验证 push 和 pull request。`npm-publish.yml` 在 GitHub Release 创建时使用 npm Trusted Publishing（OIDC），但 `package.json` 仍为 `private: true` 时跳过发布。未来发布 npm 须明确授权、移除该保护，并在 npm 为仓库和工作流配置 trusted publisher；不使用长期 npm token。初始化仓库本身不创建 Release 或发布 npm。
+scoped npm 包配置为公开访问。GitHub Actions 验证 push 和 pull request。首次发布需要已认证的 npm 维护者；之后在 npm 为本仓库和 `npm-publish.yml` 配置 trusted publisher，未来创建 GitHub Release 时通过 OIDC 发布，工作流不使用长期 npm token。发布和创建 Release 属于外部操作，仍须明确授权。
 
 ## 请求主流程
 
