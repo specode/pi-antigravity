@@ -5,7 +5,7 @@ import { createModels, InMemoryCredentialStore, type Provider, type ProviderAuth
 import {
   AntigravityOAuthError, createAntigravityAuth, getApiKey, initializeAccount, loginAntigravity,
   OAUTH_AUTH_URL, OAUTH_CLIENT_ID, OAUTH_REDIRECT_URI, OAUTH_SCOPES, OAUTH_TOKEN_URL,
-  parseApiKey, parseOAuthCallback, refreshAntigravityToken, type AntigravityOAuthCredential,
+  parseApiKey, parseOAuthCallback, parseOAuthInput, refreshAntigravityToken, type AntigravityOAuthCredential,
 } from "../src/auth.ts";
 import { DEFAULT_BASE_URL, type postJson } from "../src/client.ts";
 
@@ -95,6 +95,86 @@ test("manual callback validates the exact origin, path, independent state and si
   }
 });
 
+test("manual input accepts the page's copied Google code or a strictly validated callback URL", () => {
+  const code = "4/0synthetic_Google-code";
+  assert.equal(parseOAuthInput(` \n${code}\r\n`, "expected"), code);
+  assert.equal(parseOAuthInput(callback("expected", code), "expected"), code);
+  for (const value of ["", "synthetic-code", "4/", "4/secret with spaces", "4/secret\nsecond-line",
+    "4/secret?state=expected", "4/secret#fragment", "4/secret&code=x", "4/secret%2Fencoded",
+    "4/secret\u0000", `4/${"x".repeat(8191)}`, callback("wrong", code),
+    `${OAUTH_REDIRECT_URI}?code=${code}`, `${callback("expected", code)}&state=expected`,
+    callback("expected", code).replace("antigravity.google", "evil.test")]) {
+    assert.throws(() => parseOAuthInput(value, "expected"), error => {
+      assert.ok(error instanceof Error);
+      assert.doesNotMatch(error.message, /secret|0synthetic/);
+      assert.equal(error.cause, undefined);
+      return true;
+    });
+  }
+});
+
+test("copied-code logins use independent PKCE verifiers and reject cross-login codes at exchange", async () => {
+  for (const swapped of [false, true]) {
+    const authorizations: URL[] = [];
+    const codes = ["4/0synthetic_first-code", "4/0synthetic_second-code"];
+    let ready!: () => void;
+    const bothReady = new Promise<void>(resolve => { ready = resolve; });
+    let initializations = 0;
+    let exchanges = 0;
+    const results = await Promise.allSettled(codes.map((_, index) => loginAntigravity({
+      signal: signal(),
+      notify(event) {
+        if (event.type === "auth_url") {
+          assert.match(event.instructions ?? "", /Copy to Clipboard/);
+          authorizations[index] = new URL(event.url);
+          if (authorizations.filter(Boolean).length === 2) ready();
+        }
+      },
+      async prompt(prompt) {
+        assert.equal(prompt.type, "manual_code");
+        assert.match(prompt.message, /authorization code/i);
+        await bothReady;
+        return ` \n${codes[swapped ? 1 - index : index]}\r\n`;
+      },
+    }, {
+      fetch: async (url, init) => {
+        if (url === OAUTH_TOKEN_URL) {
+          exchanges++;
+          const body = new URLSearchParams(String(init?.body));
+          assert.equal(body.get("redirect_uri"), OAUTH_REDIRECT_URI);
+          assert.equal(body.get("grant_type"), "authorization_code");
+          const codeIndex = codes.indexOf(body.get("code")!);
+          assert.notEqual(codeIndex, -1);
+          const challenge = createHash("sha256").update(body.get("code_verifier")!).digest("base64url");
+          // Model the token endpoint's PKCE binding, not a live Google exchange.
+          if (challenge !== authorizations[codeIndex]!.searchParams.get("code_challenge")) {
+            return json({ error: "invalid_grant" }, 400);
+          }
+          return json(token());
+        }
+        return json({ email: "alice@example.test" });
+      },
+      postJson: async () => { initializations++; return { cloudaicompanionProject: "synthetic-project" }; },
+    })));
+    assert.equal(exchanges, 2);
+    assert.notEqual(authorizations[0]!.searchParams.get("code_challenge"), authorizations[1]!.searchParams.get("code_challenge"));
+    assert.notEqual(authorizations[0]!.searchParams.get("state"), authorizations[1]!.searchParams.get("state"));
+    assert.equal(initializations, swapped ? 0 : 2);
+    for (const result of results) {
+      if (swapped) {
+        assert.equal(result.status, "rejected");
+        if (result.status === "rejected") {
+          assert.ok(result.reason instanceof AntigravityOAuthError);
+          assert.equal(result.reason.code, "invalid_grant");
+        }
+      } else {
+        assert.equal(result.status, "fulfilled");
+        if (result.status === "fulfilled") assert.equal(result.value.projectId, "synthetic-project");
+      }
+    }
+  }
+});
+
 test("native manual login uses statically checked CLI consumer parameters, PKCE, and Pi persistence shape", async () => {
   let authorization: URL;
   let seenVerifier = "";
@@ -130,10 +210,15 @@ test("native manual login uses statically checked CLI consumer parameters, PKCE,
   assert.equal(calls.length, 2);
 });
 
-test("login rejects state mismatch before any token exchange", async () => {
-  await assert.rejects(loginAntigravity(interaction(() => callback("wrong")), {
-    fetch: async () => { assert.fail("No exchange on bad state"); }, postJson: noTransport,
-  }), /state mismatch/);
+test("login rejects invalid manual input before any token exchange", async () => {
+  for (const value of [callback("wrong"), "4/invalid code", `${OAUTH_REDIRECT_URI}?code=4/synthetic`,
+    callback("expected").replace("antigravity.google", "evil.test")]) {
+    let requests = 0;
+    await assert.rejects(loginAntigravity(interaction(() => value), {
+      fetch: async () => { requests++; assert.fail("No exchange on invalid manual input"); }, postJson: noTransport,
+    }), /state|code|callback/i);
+    assert.equal(requests, 0);
+  }
 });
 
 test("login cancellation and deadline stop a non-cooperative manual prompt", async () => {

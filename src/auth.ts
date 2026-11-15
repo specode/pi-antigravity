@@ -127,8 +127,10 @@ export async function initializeAccount(token: string, options: InitializeAccoun
  * 0x102b7a400. Google Endpoint has AuthStyleInParams (1). It calls standard
  * oauth2 Config.Exchange and tokenRefresher.Token. These are public client
  * application parameters, not user credentials. Static verification is not
- * a live /login acceptance test. We require full URLs/state rather than the
- * CLI's more permissive bare-code input; no localhost/ACP flow is implemented.
+ * a live /login acceptance test. The official callback page copies a bare code
+ * and removes query parameters from the address bar. Manual codes rely on the
+ * token endpoint's S256 PKCE binding; full URLs additionally validate state.
+ * No localhost/ACP flow is implemented.
  */
 export const OAUTH_CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";
 const OAUTH_CLIENT_SECRET = "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";
@@ -178,6 +180,22 @@ export function parseOAuthCallback(value: string, expectedState: string): string
   const code = url.searchParams.getAll("code");
   if (code.length !== 1 || !wireString(code[0])) throw new Error("Antigravity OAuth callback is missing a valid authorization code.");
   return code[0];
+}
+
+/**
+ * The official page's Copy to Clipboard button returns a Google code, not a URL
+ * or state. Accept its current 4/... format verbatim; never fabricate state or
+ * retry a rejected URL as a code. The login must exchange it with its own PKCE
+ * verifier. URL input retains the stricter origin/path/code/state checks above.
+ */
+export function parseOAuthInput(value: string, expectedState: string): string {
+  const input = value.trim();
+  if (wireString(input) && /^4\/[A-Za-z0-9_-]+$/.test(input)) return input;
+  let url: URL;
+  try { url = new URL(input); } catch {
+    throw new Error("Paste the authorization code from the Antigravity page's Copy to Clipboard button, or the complete callback URL.");
+  }
+  return parseOAuthCallback(url.href, expectedState);
 }
 
 async function oauthJson(url: string, init: RequestInit, signal: AbortSignal, options: AuthOptions): Promise<Record<string, unknown>> {
@@ -240,10 +258,10 @@ export async function loginAntigravity(interaction: ProviderAuthInteraction, opt
     response_type: "code", scope: OAUTH_SCOPES.join(" "), code_challenge: challenge, code_challenge_method: "S256",
     state, access_type: "offline", prompt: "consent" });
   interaction.notify({ type: "auth_url", url: `${OAUTH_AUTH_URL}?${params}`,
-    instructions: "Sign in, then paste the complete final Antigravity callback URL (including code and state)." });
-  const pasted = await waitForPrompt(interaction.prompt({ type: "manual_code", message: "Paste the complete Antigravity callback URL:", signal }), signal);
+    instructions: "Sign in, click Copy to Clipboard on the Antigravity page, then paste the authorization code here. Use the code from this login attempt, not the address bar URL." });
+  const pasted = await waitForPrompt(interaction.prompt({ type: "manual_code", message: "Paste the Antigravity authorization code (or complete callback URL):", signal }), signal);
   signal.throwIfAborted();
-  const code = parseOAuthCallback(pasted, state);
+  const code = parseOAuthInput(pasted, state);
   const now = (options.now ?? Date.now)();
   const data = await exchangeToken({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: OAUTH_REDIRECT_URI }, signal, options);
   const fields = tokenFields(data, now);

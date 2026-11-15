@@ -2,84 +2,90 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
-独立维护的 Pi Antigravity 订阅 provider。适配官方 **agy CLI 的 HTTP 协议**，运行时不启动官方 CLI、ACP bridge 或另一套 agent。
+一个 [Pi](https://github.com/earendil-works/pi-mono) 扩展：对齐官方 agy CLI 的 HTTP 协议，在 Pi 中注册 Antigravity（`antigravity`）订阅聊天提供商。
 
-**状态：公开源码的聊天 provider，已安装到本机并获用户实测确认。** 基于 Pi **1.5.2** 完成合成 HTTP 测试和受限真实对照；验收边界见下文。
+直接使用 Antigravity 订阅连接 Google Cloud Code 接口，复用 Pi 原生的 OAuth 凭据存储、模型目录、工具执行与会话管理，无需运行官方 CLI 二进制、ACP 桥接进程或另一套 Agent 循环。
 
 ## 安装
 
-需要 Node.js >= 22.19.0，以及本实现使用的 Pi 1.5.2 provider API。全新 npm 安装请使用 0.1.1 或更高版本；0.1.0 的 Pi 子路径导入可能依赖开发目录中的依赖才能解析。
+需要 Node.js >= 22.19.0，以及 Pi >= 1.5.2。
 
 从 npm 安装：
 
-```sh
+```bash
 pi install npm:@specode/pi-antigravity
 ```
 
-也可以从 GitHub 安装：
+从 GitHub 安装：
 
-```sh
+```bash
 pi install git:github.com/specode/pi-antigravity
 ```
 
-如果已安装旧 `pi-antigravity` 包，先执行 `pi remove npm:pi-antigravity`。不要同时加载两个注册 `antigravity` 的实现。保留现有 Pi OAuth 凭据，无需迁移 CLI 登录存储。
+从本地目录安装（开发调试）：
 
-安装后执行 `/reload` 或重启 Pi。需要登录时运行 `/login`，选择 Antigravity，并按提示粘贴完整回调 URL；通过 `/model` 选择聊天模型。
-
-本地开发也可以直接安装源码目录：
-
-```sh
+```bash
 pi install /path/to/pi-antigravity
 ```
 
-## 开发验证
+安装后执行 `/reload` 或重启 Pi 生效。
 
-```sh
+如果已安装其他同样注册 `antigravity` provider ID 的包（例如 `pi-antigravity`），请先执行 `pi remove npm:pi-antigravity` 卸载，不要同时加载两个 `antigravity` 提供商。`~/.pi/agent/auth.json` 中已有的 Pi OAuth 登录凭据可直接复用。
+
+## 使用说明
+
+1. 执行 `/login`，依次选择 `Sign in with an account` → `Antigravity`（`Sign in with Google (Antigravity subscription)`），在浏览器中打开终端提示的授权链接。
+2. 完成 Google 账号授权后，在 Antigravity 页面点击 **Copy to Clipboard**，将授权码粘贴回 Pi。请使用本次登录产生的授权码，不要复制地址栏 URL——页面会主动移除其中的查询参数。同时兼容包含 `code` 和 `state` 的完整回调 URL。
+3. 执行 `/model` 选择 `antigravity` 下的模型，并按需切换推理档位（thinking effort）。
+
+### 模型发现与路由规则
+
+| 环节 | 行为 |
+| --- | --- |
+| 目录拉取 | 调用 `loadCodeAssist` 与 `fetchAvailableModels`，仅公开精选聊天模型（`agentModelSorts` / `recommended`），过滤内部占位符与生图模型 |
+| 推理档位 | 将带 `-low`、`-medium`、`-high` 后缀的运行时模型归并到同一公开模型 ID 下，并映射为 `generationConfig.thinkingConfig`；不支持的档位直接报错，不暗中降级 |
+| 离线缓存 | 按账号将最近一次成功的模型目录保存在 Pi 的 `models-store.json` 中（刷新周期 4 小时）；支持离线启动恢复，刷新失败时保留已有目录 |
+| 账号隔离 | 目录缓存绑定当前登录账号（`email` 或派生的 `ownershipId`）、`projectId` 与官方接口地址；切换账号时自动隐藏旧账号目录 |
+| 用量与成本 | 从流式元数据记录输入、缓存命中、输出与思考 token 用量；成本字段固定记为 `0`（表示订阅未按 token 定价，而非免费 API 额度） |
+
+### 配套扩展
+
+- **[`@specode/pi-subscription-usage`](https://github.com/specode/pi-subscription-usage)**：在底部状态栏和 `/usage` 中显示 Antigravity 订阅额度池（Gemini、Claude 与 GPT、Gemini 4 Argon）。本扩展保持相同的 `antigravity` provider ID、官方 Google 接口地址与 `{ token, projectId, email }` 凭据桥接格式，无需额外配置即可配合使用。
+- **[`@specode/pi-last-model-effort`](https://github.com/specode/pi-last-model-effort)**：记住每个 Antigravity 模型上次选择的推理档位，并在切换模型或新开 TUI 会话时自动恢复。
+
+## 协议适配与边界
+
+- **对齐官方 CLI HTTP 协议**：面向个人订阅（默认连接 `https://daily-cloudcode-pa.googleapis.com`；账号需具备已初始化的 Cloud Code Assist 项目，不包含企业版路由或自动 GCP 项目开通）。聊天请求发往 `/v1internal:streamGenerateContent?alt=sse`，携带 `antigravity/cli/1.5.9`（构建号 `1021519450`）客户端标识、当前主机系统平台与架构、`agent` 外层请求结构、会话轨迹标签以及空种子 64 位 FNV-1a `sessionId`。
+- **复用公开转换器与工具闭环**：通过宿主公开的包导出加载 `@earendil-works/pi-ai` 的 Google 消息与工具转换器，完整保留 `thoughtSignature`（含空文本块上的签名）、多工具调用 ID 配对及已验证的 `gemini-3.8-flash-low` 函数结果角色调整；仅在 JSON Schema 关键字位置将类型转为大写，不改动工具属性名或字面值，遇到不支持的 `$ref` / `$dynamicRef` 引用或 `strict: "require"` 约束时直接报错，不静默丢弃工具。
+- **精确改写默认系统提示词开头**：仅在序列化发往后端的请求时，将 Pi 默认的两句固定开头替换为 `You are a coding agent helping the user with their project.`，避免后端对该固定开头返回 `429 RESOURCE_EXHAUSTED`；不修改用户消息、会话文件、项目规则或自定义提示词。
+- **聚焦核心范围**：仅提供文本对话、编码与工具调用能力；不包含图片生成／编辑、网页搜索／抓取工具、多账号轮换、超额 credits、后台预热或内置额度 UI。
+- **单次受控传输**：每轮请求仅发起一次 HTTP 调用，分别设置响应头超时（30 秒）与流空闲超时（120 秒）；不内置隐式重试，不在失败或部分输出后暗中切换模型、降级推理档位或切换接口地址。
+
+## 隐私与安全
+
+- 仅通过 Pi 原生的 OAuth 存储（`auth.json`）管理凭据，不读取、复制或迁移官方 CLI 登录文件或系统钥匙串。
+- 请求仅发往白名单内的官方 HTTPS 域名（默认为 `https://daily-cloudcode-pa.googleapis.com`，以及 `https://cloudcode-pa.googleapis.com` 和 `https://daily-cloudcode-pa.sandbox.googleapis.com`），并禁用重定向（`redirect: "error"`）。
+- OAuth 登录接受官方页面复制的授权码，并携带本次登录独立生成的 S256 PKCE verifier 交换令牌。复制的授权码不含 `state`，此路径依靠令牌端点的 PKCE 校验。仍兼容完整的 `https://antigravity.google/oauth-callback` URL，严格校验 origin／path 并进行常量时间的 `state` 校验；无效 URL 不会退回裸授权码解析。
+- OAuth 与流式传输报错仅保留白名单错误码或受限诊断元数据，绝不在异常消息、日志或模型目录缓存中写入访问令牌或刷新令牌。
+
+## 本地开发
+
+```bash
+# 安装依赖
 npm ci
+
+# 运行类型检查、离线测试、隔离打包加载测试和打包文件检查
 npm run check
+
+# 仅运行离线单元与集成测试
+npm test
+
+# 在禁网的隔离 Pi 环境中验证已发布的 npm 包
+npm run smoke -- @specode/pi-antigravity@0.1.2
 ```
 
-`check` 包含严格类型检查、离线测试、隔离的发布包加载测试及打包预检。冒烟测试先打包，再解压到源码目录之外，不带扩展的开发依赖，以合成凭据在真实 Pi 中加载并阻止网络 fetch，不触碰用户已安装扩展或凭据。发布后可运行 `npm run smoke -- @specode/pi-antigravity@<version>` 同样验证 registry 中的实际包。
+当前验证覆盖严格类型检查、离线单元与集成测试（含基于 mock Gemini／Claude 流的本地 Pi `read` 工具闭环）、官方 agy CLI `1.5.9` 参数静态核对，以及基于 Pi `1.5.2` 的个人订阅账号实测；首次浏览器 `/login` 及跨账号／全模型组合尚未逐一单独验收。详细架构说明与验收边界见 [AGENTS.md](./AGENTS.md)，脱敏协议研究样本见 [`test/fixtures/agy-cli-1.5.9/manifest.json`](./test/fixtures/agy-cli-1.5.9/manifest.json)。
 
-扩展入口为 `src/index.ts`。不要与另一个注册 `antigravity` 的 provider 同时加载。切换用户安装、真实账号测试和发布均为独立步骤，不会由开发测试执行。
+## 许可证
 
-## 发布
-
-scoped npm 包公开访问。GitHub Actions 验证 push 和 pull request。npm 已为 `specode/pi-antigravity` 和 `npm-publish.yml` 配置 Trusted Publishing，后续 GitHub Release 通过 OIDC 发布，不使用长期 npm token。0.1.0 已经维护者认证完成首次发布；后续 Release 必须使用新版本号，不重复发布既有版本。发布和创建 Release 属于外部操作，仍须明确授权。
-
-## 请求主流程
-
-1. **认证**：Pi 原生 OAuth 注册，Google 手动粘贴完整回调 URL 登录，校验 PKCE／state，支持 token 刷新。凭据保存和刷新锁由 Pi 管理。保留现有 OAuth 的 `access`、`refresh`、`expires`、`projectId` 及可选 `email`。
-2. **目录**：初始化 consumer 账号并拉取精选聊天目录。公开模型 id 与 runtime id、明确发现的思考档位分离。Pi 标准模型存储保留账号隔离的最后成功快照，支持离线启动；刷新失败不清空快照。
-3. **转换**：复用 Pi 公开 Google 转换器和标准 transcript。仅在序列化系统提示词时精确替换 Pi 已知开头两句，保留规则、工具、用户文本和会话记录。
-4. **流式处理**：只向批准的官方 HTTPS origin 发送一次 HTTP 请求，增量解析 SSE，保留 Pi 观测钩子、签名、工具调用与用量，支持取消、独立的响应头／流空闲超时及唯一终止事件。不内置重试，不暗中切换 endpoint 或模型。
-
-默认 endpoint 为交接中 consumer 账号实际使用的 `https://daily-cloudcode-pa.googleapis.com`，不宣称适用于所有企业账号。CLI 身份固定为 **1.5.9／构建 1021519450**，平台与架构取当前主机实际值。
-
-## 功能边界
-
-- 仅维护聊天／编码 provider。Antigravity 生图／编辑计划已取消，不再列为待开发或待测试任务。
-- 仅公开精选聊天模型和明确支持的思考变体。不猜测未知思考协议；不支持的显式档位直接报错。
-- 尚无订阅按 token 计费依据。Pi 成本元数据中的零表示**未定价**，不表示免费，也不是账单估算。请求 token 用量与订阅额度分开。
-- 保留工具 schema 属性名和字面值。不支持的引用或必须严格采样的契约明确失败，不静默删除工具。
-- 请求 UUID 与 transcript 计数属于本 provider 的本地记账，不声称还原了 CLI 所有重试／恢复规则。Pi session id 让普通恢复保持标识稳定、fork 相互隔离；无 session id 的直接调用按临时会话处理。
-- 不实现账号切换、超额 credits、后台预热、额度 UI、搜索／网页工具、CLI 登录存储迁移或 Pi 私有运行时依赖。
-
-## 独立插件协作
-
-- **[pi-subscription-usage](https://github.com/specode/pi-subscription-usage)**：负责额度查询和展示。JSON 凭据桥接保留 `token`、`projectId` 及可选 `email`。无 email 的账号额外携带不透明的 `ownershipId`（由 Pi 以 `antigravityOwnershipId` 保存），避免 token 轮换破坏目录归属；既有消费者可忽略此字段。本次开发不修改该插件。
-- **[pi-subscription-image](https://github.com/specode/pi-subscription-image)**：已有 Codex/Grok 功能保持不变，原计划的 Antigravity 后端已取消；本 provider 不注册生图 API 或工具。早期生图证据仅作为历史调研记录保留。
-
-## 证据与待完成验收
-
-此前 **2026-11-15** 协议调研共执行 17 次生成请求，覆盖原生 read 工具可行性、严格的提示词开头对照及一次参考图请求。[证据清单](./test/fixtures/agy-cli-1.5.9/manifest.json) 区分官方抓包和直接探测。脱敏记录仅用于结构取证，不能重放。
-
-当前离线测试覆盖 Pi 原生模型／认证集成，使用 mock Gemini／Claude 响应执行真实的本地 Pi read 工具，并覆盖异常流、取消、超时、签名、并发和缓存隔离。OAuth 应用参数已对照固定版本官方 CLI 归档静态核实；**这不等于真实浏览器登录已验收**。
-
-本机部署另外验证了真实账号初始化和目录发现，6 个公开模型的持久化及已安装 CLI 的离线恢复。既有凭据保持不变。
-
-另经独立授权执行 6 次 Argon High 对照，定位到本仓库自身注入的项目规则：真正的开头虽已适配，文档却又逐字引用了原始 Pi 开头。严格保持请求其他字段相同，仅把该文档段落改为源码引用，结果从 429 变为 200。已移除 `AGENTS.md` 的这一逐字示例并增加回归测试，不改写任意用户规则或历史。测试限制了输出且未执行工具，不能视为完整工具闭环验收。受影响会话应先重载 Pi 的项目规则再重试。
-
-用户随后反馈修复后实际测试正常，记为本机部署及该修复的用户验收；不据此宣称所有模型、工具续轮、登录、恢复或取消流程均已验证。
-
-仍未单独验收的范围：经授权的 `/login`、真实完整工具闭环与会话 UI，以及更广泛的账号／模型覆盖。Antigravity 生图不在范围内，不是未完成待办。精确契约和限制统一见唯一开发／交接入口 [AGENTS.md](./AGENTS.md)。
+[MIT](./LICENSE)。协议参考与第三方声明见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。

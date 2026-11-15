@@ -2,84 +2,90 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
-An independently maintained Antigravity subscription provider for Pi. It adapts the official **agy CLI HTTP protocol** without running the CLI, an ACP bridge, or another agent.
+A [Pi](https://github.com/earendil-works/pi-mono) extension that registers the Antigravity (`antigravity`) subscription chat provider using the official agy CLI HTTP protocol.
 
-**Status: public-source chat provider, installed and user-tested locally.** Tested against Pi **1.5.2** with synthetic HTTP responses and bounded live diagnostics; see the acceptance limits below.
+It connects directly to Google's Cloud Code API with your Antigravity subscription and reuses Pi's native OAuth storage, model catalog, tool execution, and session management—without running the official CLI binary, an ACP bridge, or a secondary agent loop.
 
 ## Installation
 
-Requires Node.js >= 22.19.0 and the Pi 1.5.2 provider APIs used by this implementation. Use version 0.1.1 or later for clean npm installations; 0.1.0 could rely on development dependencies to resolve Pi subpath imports.
+Requires Node.js >= 22.19.0 and Pi >= 1.5.2.
 
 From npm:
 
-```sh
+```bash
 pi install npm:@specode/pi-antigravity
 ```
 
-Or from GitHub:
+From GitHub:
 
-```sh
+```bash
 pi install git:github.com/specode/pi-antigravity
 ```
 
-If the older `pi-antigravity` package is installed, remove it first with `pi remove npm:pi-antigravity`. Never load two implementations of the `antigravity` provider together. Existing Pi OAuth credentials are retained; no CLI credential migration is required.
+From a local directory for development:
 
-Run `/reload` or restart Pi after installation. If needed, use `/login`, choose Antigravity, and paste the complete callback URL when prompted. Select a chat model with `/model`.
-
-For local development:
-
-```sh
+```bash
 pi install /path/to/pi-antigravity
 ```
 
+Run `/reload` or restart Pi after installing.
+
+If another package registering the `antigravity` provider ID (such as `pi-antigravity`) is installed, remove it first with `pi remove npm:pi-antigravity`. Only one `antigravity` provider should be loaded at a time. Existing Pi OAuth credentials in `~/.pi/agent/auth.json` are reused as-is.
+
+## Usage
+
+1. Run `/login`, choose `Sign in with an account` → `Antigravity` (`Sign in with Google (Antigravity subscription)`), and open the authorization URL in your browser.
+2. After signing in with Google, click **Copy to Clipboard** on the Antigravity page and paste the authorization code into Pi. Use the code from this login attempt, not the address bar URL—the page removes its query parameters. A complete callback URL containing `code` and `state` is also accepted.
+3. Run `/model` to select an `antigravity` model and adjust its thinking effort as needed.
+
+### Model Discovery and Routing
+
+| Aspect | Behavior |
+| --- | --- |
+| Catalog discovery | Calls `loadCodeAssist` and `fetchAvailableModels`, exposing curated chat models (`agentModelSorts` / `recommended`) and filtering out internal placeholders and image models |
+| Thinking effort | Groups explicit `-low`, `-medium`, and `-high` runtime suffixes under one public model ID and maps the selected effort to `generationConfig.thinkingConfig`; unsupported effort levels fail explicitly without silent downgrades |
+| Offline cache | Saves the last successful catalog per account in Pi's `models-store.json` (4-hour refresh TTL); restores cached models on offline startup and retains them if a refresh fails |
+| Account isolation | Binds cached models to the authenticated account (`email` or derived `ownershipId`), `projectId`, and official endpoint; switching accounts hides the previous catalog |
+| Token usage and cost | Populates prompt, cached, output, and thinking token counts from stream metadata; sets cost fields to `0` (unpriced subscription usage, not free API billing) |
+
+### Companion Extensions
+
+- **[`@specode/pi-subscription-usage`](https://github.com/specode/pi-subscription-usage)**: Displays Antigravity subscription quota pools (Gemini, Claude & GPT, and Gemini 4 Argon) in the footer status bar and via `/usage`. This provider preserves the `antigravity` provider ID, official Google endpoint, and `{ token, projectId, email }` credential bridge expected by `pi-subscription-usage`.
+- **[`@specode/pi-last-model-effort`](https://github.com/specode/pi-last-model-effort)**: Remembers the thinking effort you last selected for each Antigravity model and restores it across model switches and new TUI sessions.
+
+## Protocol and Boundaries
+
+- **Official CLI HTTP alignment**: Targets consumer Antigravity subscriptions (`https://daily-cloudcode-pa.googleapis.com` by default; requires an existing Cloud Code Assist project, with no enterprise routing or automatic GCP project onboarding). Sends chat requests to `/v1internal:streamGenerateContent?alt=sse` with the `antigravity/cli/1.5.9` (build `1021519450`) client identity, host OS/architecture, `agent` request envelope, trajectory labels, and empty-seed 64-bit FNV-1a `sessionId`.
+- **Public Pi converters and tool loop**: Resolves `@earendil-works/pi-ai`'s public Google message and tool converters through host package exports, preserving `thoughtSignature` (including signed empty text parts), paired tool-call IDs, and the verified `gemini-3.8-flash-low` function-response role adjustment. Tool schema types are uppercased only at JSON Schema keyword positions without altering property names or literal values; unsupported `$ref` / `$dynamicRef` schemas or `strict: "require"` contracts fail explicitly instead of silently dropping tools.
+- **Targeted system prompt rewrite**: Rewrites only Pi's exact default two-sentence opening in the serialized request to `You are a coding agent helping the user with their project.` so the backend does not reject the default opening with `429 RESOURCE_EXHAUSTED`. User messages, session files, project rules, and custom prompts are never modified.
+- **Focused scope**: Provides text chat, coding, and tool calling only. Does not include image generation/editing, web search/fetch tools, multi-account rotation, credit overage, background warming, or a built-in quota UI.
+- **Predictable transport**: Makes a single HTTP request per turn with separate response-header (30s) and stream-idle (120s) timeouts. Never performs hidden retries or silent model, effort, or endpoint failover.
+
+## Privacy and Safety
+
+- Credentials are managed solely by Pi's native OAuth store (`auth.json`). The extension never reads, copies, or migrates official CLI credential files or OS keychain entries.
+- Requests are sent only to allowlisted official HTTPS origins (`https://daily-cloudcode-pa.googleapis.com` by default, plus `https://cloudcode-pa.googleapis.com` and `https://daily-cloudcode-pa.sandbox.googleapis.com`) with HTTP redirects disabled (`redirect: "error"`).
+- OAuth sign-in accepts the authorization code copied from the official page and exchanges it using this login attempt's independent S256 PKCE verifier. The copied code contains no `state`, so that path relies on the token endpoint's PKCE validation. Complete `https://antigravity.google/oauth-callback` URLs are also accepted, with strict origin/path checks and constant-time `state` validation; invalid URLs never fall back to bare-code parsing.
+- OAuth and streaming error messages expose only allowlisted error codes or bounded diagnostic metadata and never include access or refresh tokens.
+
 ## Development
 
-```sh
+```bash
+# Install dependencies
 npm ci
+
+# Run typecheck, offline tests, isolated packed-extension smoke test, and package check
 npm run check
+
+# Run offline unit and integration tests only
+npm test
+
+# Validate a published npm version in an isolated Pi environment with network blocked
+npm run smoke -- @specode/pi-antigravity@0.1.2
 ```
 
-`check` runs strict type checking, offline tests, an isolated packed-extension smoke test, and a package dry run. The smoke test packs and extracts the package outside the checkout, without the extension's development dependencies, then loads it in real Pi with synthetic credentials and network fetches blocked. It does not touch your installed extensions or credentials. After publication, `npm run smoke -- @specode/pi-antigravity@<version>` validates the registry artifact the same way.
+Verification covers strict type checking, offline unit/integration suites (including local Pi `read`-tool execution against mocked Gemini/Claude streams), static checks against official agy CLI `1.5.9`, and bounded consumer-account testing on Pi `1.5.2`; live browser `/login` and exhaustive model/account combinations have not all been individually verified. See [AGENTS.md](./AGENTS.md) for architecture and verification boundaries, and [`test/fixtures/agy-cli-1.5.9/manifest.json`](./test/fixtures/agy-cli-1.5.9/manifest.json) for redacted protocol research fixtures.
 
-The extension entry is `src/index.ts`. Do not load it alongside another provider registered as `antigravity`. Switching your installed provider, live account testing, and publishing are separate steps—not performed by development tests.
+## License
 
-## Publishing
-
-The scoped npm package is public. GitHub Actions validates pushes and pull requests. npm Trusted Publishing is configured for `specode/pi-antigravity` and `npm-publish.yml`, allowing future GitHub Release publications through OIDC without a long-lived npm token. Version 0.1.0 was bootstrapped through maintainer authentication; releases must use a new package version, never republish an existing one. Publishing and creating releases are external operations and require explicit authorization.
-
-## Request flow
-
-1. **Authentication:** native Pi OAuth registration, Google manual callback-URL login with PKCE/state validation, and token refresh. Pi owns credential storage and refresh locking. Existing OAuth credentials retain `access`, `refresh`, `expires`, `projectId`, and optional `email`.
-2. **Discovery:** initialize the consumer account and fetch the curated chat catalog. Public model IDs are separate from runtime IDs and explicitly discovered effort variants. Pi's standard model store retains the last successful account-owned snapshot for offline startup; failed refreshes do not erase it.
-3. **Conversion:** reuse Pi's public Google converters and normalized transcript. Rewrite only Pi's exact known opening sentences in the serialized system prompt; preserve rules, tools, user text, and session history.
-4. **Streaming:** one HTTP attempt to an approved official HTTPS origin, incremental SSE parsing, Pi instrumentation hooks, signatures, tool calls, usage, cancellation, separate header/idle deadlines, and one terminal event. No internal retries or hidden endpoint/model failover.
-
-The default endpoint is `https://daily-cloudcode-pa.googleapis.com`, observed for the consumer account in the handoff. This is not a universal enterprise-routing claim. CLI identity is pinned to **1.5.9 / build 1021519450**, with the actual host platform and architecture.
-
-## Boundaries
-
-- Chat/coding provider only. Antigravity image generation/editing has been cancelled and is not a remaining implementation or testing task.
-- Only curated chat models and explicit supported thinking variants are exposed. Unknown thinking contracts are omitted rather than guessed; unsupported requested effort fails visibly.
-- Subscription per-token billing is not known. Pi's zero cost metadata means **unpriced**, not free usage or an invoice estimate. Token usage is recorded separately from subscription quota.
-- Tool schema names and literal values remain unchanged. Unsupported references or required strict-sampling contracts fail instead of silently removing tools.
-- Request UUIDs and transcript counters are provider-local bookkeeping, not a claimed reconstruction of every CLI retry/resume rule. Pi session IDs keep ordinary resumes stable and forks separate; direct calls without a session ID are ephemeral.
-- No account switching, credit overage, background warming, quota UI, search/fetch tools, CLI storage migration, or private Pi runtime imports.
-
-## Companion plugins
-
-- **[pi-subscription-usage](https://github.com/specode/pi-subscription-usage):** owns quota queries and display. The JSON credential bridge retains `token`, `projectId`, and optional `email`. Email-less accounts add an opaque `ownershipId` (persisted by Pi as `antigravityOwnershipId`) so token rotation cannot break catalog ownership; existing consumers can ignore it. This development work does not modify that plugin.
-- **[pi-subscription-image](https://github.com/specode/pi-subscription-image):** its existing Codex/Grok functionality is unchanged. The planned Antigravity backend has been cancelled; this provider registers no image-generation API or tool. Earlier image evidence is retained only as historical research.
-
-## Evidence and remaining acceptance
-
-The earlier **2026-11-15** protocol investigation covered 17 generation requests, including native read-tool feasibility, strict prompt-opening controls, and one reference-image request. [The evidence manifest](./test/fixtures/agy-cli-1.5.9/manifest.json) distinguishes official captures from direct probes. Redacted records are structural evidence, not replayable requests.
-
-Current offline tests exercise native Pi model/auth integration and real local Pi read-tool execution against mocked Gemini/Claude responses, plus malformed streams, cancellation, timeouts, signatures, concurrency, and cache isolation. OAuth application parameters were statically checked against the pinned official CLI archive; **this is not a live browser-login test**.
-
-Local deployment also verified real account initialization and catalog discovery, persistence of six public models, and offline restoration by the installed CLI. Existing credentials were unchanged.
-
-A separately authorized six-request Argon High diagnosis isolated a 429 to this repository's own injected instructions: they quoted the original Pi opening after the leading prompt had already been adapted. A strict same-request comparison changed only that documentation block to a source reference and returned 429 → 200. The literal example was removed from `AGENTS.md`, not from arbitrary user rules or history; a regression test prevents reintroduction. Small output caps and no tool execution mean this is not full tool-loop acceptance. Reload Pi's project rules before retrying an affected session.
-
-The user subsequently reported successful real usage after the fix. This records local deployment/fix acceptance, not verified coverage of every model, tool continuation, login, resume, or cancellation path.
-
-Remaining individually unverified areas: authorized `/login`, complete live tool-loop and session UI acceptance, and broader account/model coverage. Antigravity image generation is out of scope, not unfinished work. See [AGENTS.md](./AGENTS.md), the sole development/handoff entry point, for exact contracts and limitations.
+[MIT](./LICENSE). See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for protocol references and third-party notices.
