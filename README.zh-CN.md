@@ -8,7 +8,7 @@
 
 ## 安装
 
-需要 Node.js >= 22.19.0，以及本实现使用的 Pi 1.5.2 provider API。
+需要 Node.js >= 22.19.0，以及本实现使用的 Pi 1.5.2 provider API。全新 npm 安装请使用 0.1.1 或更高版本；0.1.0 的 Pi 子路径导入可能依赖开发目录中的依赖才能解析。
 
 从 npm 安装：
 
@@ -39,13 +39,13 @@ npm ci
 npm run check
 ```
 
-`check` 包含严格类型检查、离线测试、真实 Pi 扩展加载的隔离冒烟测试及打包预检。冒烟测试使用临时配置目录并阻止网络 fetch，不触碰用户已安装扩展或凭据。
+`check` 包含严格类型检查、离线测试、隔离的发布包加载测试及打包预检。冒烟测试先打包，再解压到源码目录之外，不带扩展的开发依赖，以合成凭据在真实 Pi 中加载并阻止网络 fetch，不触碰用户已安装扩展或凭据。发布后可运行 `npm run smoke -- @specode/pi-antigravity@<version>` 同样验证 registry 中的实际包。
 
 扩展入口为 `src/index.ts`。不要与另一个注册 `antigravity` 的 provider 同时加载。切换用户安装、真实账号测试和发布均为独立步骤，不会由开发测试执行。
 
 ## 发布
 
-scoped npm 包配置为公开访问。GitHub Actions 验证 push 和 pull request。首次发布需要已认证的 npm 维护者；之后在 npm 为本仓库和 `npm-publish.yml` 配置 trusted publisher，未来创建 GitHub Release 时通过 OIDC 发布，工作流不使用长期 npm token。发布和创建 Release 属于外部操作，仍须明确授权。
+scoped npm 包公开访问。GitHub Actions 验证 push 和 pull request。npm 已为 `specode/pi-antigravity` 和 `npm-publish.yml` 配置 Trusted Publishing，后续 GitHub Release 通过 OIDC 发布，不使用长期 npm token。0.1.0 已经维护者认证完成首次发布；后续 Release 必须使用新版本号，不重复发布既有版本。发布和创建 Release 属于外部操作，仍须明确授权。
 
 ## 请求主流程
 

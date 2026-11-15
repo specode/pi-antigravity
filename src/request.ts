@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Api, Model, SimpleStreamOptions, TranscriptContext } from "@earendil-works/pi-ai";
-import { convertMessages, convertTools, mapToolChoice } from "@earendil-works/pi-ai/api/google-shared";
-import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
+import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai";
+import { convertMessages, convertTools, mapToolChoice } from "./google-shared.ts";
 
 const PI_OPENING = "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.";
 const CLI_OPENING = "You are a coding agent helping the user with their project.";

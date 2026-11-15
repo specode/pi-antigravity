@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   Api, AssistantMessage, AssistantMessageEventStream, JsonObject, Model, SimpleStreamOptions, TranscriptContext,
 } from "@earendil-works/pi-ai";
-import { calculateCost } from "@earendil-works/pi-ai/models";
-import { createAssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
+import { calculateCost, createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 import { CLIENT_USER_AGENT, DEFAULT_BASE_URL, assertOfficialBaseUrl } from "./client.ts";
 
 export interface AntigravityStreamOptions extends SimpleStreamOptions {

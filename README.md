@@ -8,7 +8,7 @@ An independently maintained Antigravity subscription provider for Pi. It adapts 
 
 ## Installation
 
-Requires Node.js >= 22.19.0 and the Pi 1.5.2 provider APIs used by this implementation.
+Requires Node.js >= 22.19.0 and the Pi 1.5.2 provider APIs used by this implementation. Use version 0.1.1 or later for clean npm installations; 0.1.0 could rely on development dependencies to resolve Pi subpath imports.
 
 From npm:
 
@@ -39,13 +39,13 @@ npm ci
 npm run check
 ```
 
-`check` runs strict type checking, offline tests, an isolated real Pi extension-load smoke test, and a package dry run. The smoke test uses a temporary config directory and blocks network fetches; it does not touch your installed extensions or credentials.
+`check` runs strict type checking, offline tests, an isolated packed-extension smoke test, and a package dry run. The smoke test packs and extracts the package outside the checkout, without the extension's development dependencies, then loads it in real Pi with synthetic credentials and network fetches blocked. It does not touch your installed extensions or credentials. After publication, `npm run smoke -- @specode/pi-antigravity@<version>` validates the registry artifact the same way.
 
 The extension entry is `src/index.ts`. Do not load it alongside another provider registered as `antigravity`. Switching your installed provider, live account testing, and publishing are separate steps—not performed by development tests.
 
 ## Publishing
 
-The scoped npm package is configured for public access. GitHub Actions validates pushes and pull requests. The first bootstrap publication requires an authenticated npm maintainer; afterward, configure this repository and `npm-publish.yml` as an npm trusted publisher for future GitHub Release publications through OIDC. The workflow requires no long-lived npm token. Publishing and creating releases are external operations and require explicit authorization.
+The scoped npm package is public. GitHub Actions validates pushes and pull requests. npm Trusted Publishing is configured for `specode/pi-antigravity` and `npm-publish.yml`, allowing future GitHub Release publications through OIDC without a long-lived npm token. Version 0.1.0 was bootstrapped through maintainer authentication; releases must use a new package version, never republish an existing one. Publishing and creating releases are external operations and require explicit authorization.
 
 ## Request flow
 

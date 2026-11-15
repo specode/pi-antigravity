@@ -12,7 +12,7 @@
 - 允许在发往后端的请求中精确改写 Pi 默认开头两句；不改写会话记录、用户消息、规则文件或任意包含 `pi` 的文本。
 - 不需要搜索、网页读取、多账号切换、企业版路由、额度 UI、静默降级、自动超额 credits、后台预热和其他 harness/fork 兼容层。
 
-**当前状态：聊天 provider 已替换本机旧包并获用户实测确认；GitHub 仓库公开，用户现已明确要求首次公开发布 npm。** `src/index.ts` 注册 Pi 原生 provider；`auth.ts`、`catalog.ts`、`request.ts`、`stream.ts` 与 `client.ts` 分别负责认证、目录、转换、流及受控 HTTP。已安装本项目开发依赖，`npm run check` 覆盖严格类型检查、134 项离线测试、隔离的真实 Pi 扩展加载和打包预检。mock Gemini／Claude 响应驱动了真实本地 Pi read 工具闭环；这些不是新的真实后端调用。已通过 `pi remove npm:pi-antigravity` 卸载旧 0.14.0，并通过 `pi install` 将本项目目录加入全局 packages；修改前已备份 settings，登录凭据和旧账号数据保持字节不变。GitHub 仓库已完成首次提交及推送，CI 通过。npm 包已移除 `private` 标记并以 `publishConfig.access: public` 配置，首次公开发布进行中，以 npm registry 实际返回版本为完成依据。真实 `loadCodeAssist`／`fetchAvailableModels` 查询成功并以 Pi 标准模型存储持久化 6 个公开模型，安装后的 CLI 已验证离线恢复；安装切换本身未发起生成请求；后续经独立授权完成了本节 6.2 所述 6 次 429 对照。已打开的 Pi 会话需 `/reload` 才更新扩展和项目规则。用户随后反馈实际测试无问题，本机切换及 429 修复记为用户实测通过；反馈未明确覆盖具体模型、工具续轮、首次登录、恢复或取消，不扩张为这些场景均已验收。首次浏览器登录及真实完整工具闭环／会话 UI 的逐项验收仍未单独确认；Antigravity 生图已取消，不再列为待办；不能把目录查询或小输出对照写成完整生成验收。Astra（`gpt-6-astra`）已独立审查并复审：无 email 凭据自动刷新导致目录失效的 P2 已修复，133 项测试及隔离 smoke 重跑通过，未发现其他具体问题；这不是线上稳定性保证。
+**当前状态：聊天 provider 已替换本机旧包并获用户实测确认；GitHub 与 npm 均公开，0.1.0 已发布，0.1.1 正在修复并验收发布包的宿主导入解析。** `src/index.ts` 注册 Pi 原生 provider；`auth.ts`、`catalog.ts`、`request.ts`、`stream.ts` 与 `client.ts` 分别负责认证、目录、转换、流及受控 HTTP。已安装本项目开发依赖，`npm run check` 覆盖严格类型检查、136 项离线测试、隔离的真实 Pi 扩展加载和打包预检。mock Gemini／Claude 响应驱动了真实本地 Pi read 工具闭环；这些不是新的真实后端调用。已通过 `pi remove npm:pi-antigravity` 卸载旧 0.14.0，并通过 `pi install` 将本项目目录加入全局 packages；修改前已备份 settings，登录凭据和旧账号数据保持字节不变。GitHub 仓库已完成首次提交及推送，CI 通过。npm 包已移除 `private` 标记并以 `publishConfig.access: public` 配置，0.1.0 的 npm 公开发布及匿名访问已验证，Trusted Publishing 已绑定本仓库与 `npm-publish.yml`。随后发现 0.1.0 在不带开发依赖的新安装中无法解析部分 Pi 子路径，0.1.1 修复只通过公开 Node／Pi API 及宿主 package exports 加载 Google 转换器；使用 root 导出的 transcript／事件流辅助函数，不修改 Pi loader、不捆绑或复制 Pi。以 registry 实际版本和脱离源码依赖的 tarball 加载结果作为修订版完成依据。真实 `loadCodeAssist`／`fetchAvailableModels` 查询成功并以 Pi 标准模型存储持久化 6 个公开模型，安装后的 CLI 已验证离线恢复；安装切换本身未发起生成请求；后续经独立授权完成了本节 6.2 所述 6 次 429 对照。已打开的 Pi 会话需 `/reload` 才更新扩展和项目规则。用户随后反馈实际测试无问题，本机切换及 429 修复记为用户实测通过；反馈未明确覆盖具体模型、工具续轮、首次登录、恢复或取消，不扩张为这些场景均已验收。首次浏览器登录及真实完整工具闭环／会话 UI 的逐项验收仍未单独确认；Antigravity 生图已取消，不再列为待办；不能把目录查询或小输出对照写成完整生成验收。Astra（`gpt-6-astra`）已独立审查并复审：无 email 凭据自动刷新导致目录失效的 P2 已修复，133 项测试及隔离 smoke 重跑通过，未发现其他具体问题；这不是线上稳定性保证。
 
 本文件是本项目唯一开发入口。用户说明维护中英文 README 并顶部互链；后续以实现和测试更新这里，不新增分散的设计过程／历史流水账。
 
@@ -29,7 +29,7 @@
 
 可按职责组织为 `src/index.ts`、`auth.ts`、`catalog.ts`、`request.ts`、`stream.ts`，必要时单独放置客户端版本与请求标识逻辑。不承诺代码行数，不复制上游整个实现。身份参数、模型路由、生命周期状态不是同一职责，不能都塞进一个“profile”配置框架。
 
-生产实现只依赖 Pi 公开契约。验证阶段曾为生成真实系统提示词／执行原生 read 而引用本机 Pi 的内部模块，这些测试手法**不是生产依赖的许可**。
+生产实现只依赖 Pi 公开契约。`src/google-shared.ts` 通过公开 `getPackageDir()`、Node `findPackageJSON()` 和宿主的公开 exports 定位 Google 转换器，解决 Pi 1.5.2 未别名映射全部 `api/*` 子路径的问题；不依赖开发目录的 node_modules，不修改全局 resolver，不访问私有 API。验证阶段曾为生成真实系统提示词／执行原生 read 而引用本机 Pi 的内部模块，这些测试手法**不是生产依赖的许可**。
 
 ## 3. 证据入口与可信度
 
@@ -181,7 +181,7 @@ You are a coding agent helping the user with their project.
 
 ## 9. 实施顺序与验收
 
-当前开发验证入口为 `npm ci && npm run check`。测试位于 `test/*.test.ts`，使用独立合成输入；`scripts/smoke.mjs` 使用临时 Pi 配置目录和合成凭据／目录，显式加载本扩展，验证真实磁盘目录恢复并禁用网络 fetch。README 中英同步说明边界。后续继续遵循以下顺序，已完成的离线步骤不替代第 7 步的真实授权验收。
+当前开发验证入口为 `npm ci && npm run check`。测试位于 `test/*.test.ts`，使用独立合成输入；`scripts/smoke.mjs` 先 npm pack，再将 tarball 解压到源码树外，不带扩展开发依赖，用临时 Pi 配置与合成凭据验证真实加载和磁盘目录恢复，并禁用网络 fetch；发布后用 `npm run smoke -- @specode/pi-antigravity@<version>` 验证实际 registry 包。README 中英同步说明边界。后续继续遵循以下顺序，已完成的离线步骤不替代第 7 步的真实授权验收。
 
 1. **先读契约**：本文件、证据 manifest、当前 Pi provider/extension 文档、现有两个插件入口和测试。核实本机接口后再写代码。
 2. **建工程**：增加真正存在的入口、依赖、typecheck、离线测试与包检查。无实现前不声明可安装扩展；公开发布按用户明确授权执行。
@@ -196,7 +196,7 @@ You are a coding agent helping the user with their project.
 
 ## 10. 参考资料与工程约束
 
-- 仓库约定与相邻插件一致：MIT（Specode）、完整 package 元数据、中英 README 顶部互链、GitHub CI，以及基于 Release 的 npm OIDC 工作流。npm 包为公开访问，不保留 private 标记或隐藏发布的 job 条件。用户已明确授权首次 npm 公开发布；首次发布需 npm 维护者认证，随后配置 trusted publisher 才能使用未来 Release 的 OIDC 发布。不得把 GitHub 仓库公开误写成 npm 已发布，也不得在 registry 验证前声称发布成功。运行时只使用 host peer，不打包 Pi、本机凭据或脱敏研究之外的原始抓包。保留 `LICENSE` 与 `THIRD_PARTY_NOTICES.md`。
+- 仓库约定与相邻插件一致：MIT（Specode）、完整 package 元数据、中英 README 顶部互链、GitHub CI，以及基于 Release 的 npm OIDC 工作流。npm 包为公开访问，不保留 private 标记或隐藏发布的 job 条件。用户已明确授权 npm 公开发布；首次 0.1.0 经 npm 维护者网页二次认证发布，trusted publisher 已绑定 `specode/pi-antigravity`／`npm-publish.yml`，后续修订版可走 Release 的 OIDC 发布。不得把 GitHub 仓库公开误写成 npm 已发布，也不得在 registry 验证前声称发布成功。运行时只使用 host peer，不打包 Pi、本机凭据或脱敏研究之外的原始抓包。保留 `LICENSE` 与 `THIRD_PARTY_NOTICES.md`。
 - GitHub Push Protection 会标记 `src/auth.ts` 的两条公开 OAuth 应用参数；首次推送的这两条例外已由用户逐项明确授权，以 `false_positive` 处理。不得把这扩大为用户 token 的例外、关闭仓库整体保护，或编码混淆参数以隐藏扫描结果。
 - 协议参考：[Rahularya01/pi-antigravity](https://github.com/Rahularya01/pi-antigravity)，当时安装版 **0.14.0**。只作为线索，已知若干转换／元数据策略与 CLI 1.5.9 不同。若复制 MIT 代码，保留授权和署名；不把运行时依赖指向上游包。
 - 官方安装入口：`https://antigravity.google/cli/install.sh`。只读安装脚本即可找官方 updater manifest，不要直接 pipe 到 shell。
