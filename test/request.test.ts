@@ -221,6 +221,34 @@ test("legacy schema metadata is stripped only at schema positions and references
 	}
 });
 
+test("Claude routes send the original JSON Schema while Gemini and GPT-OSS keep the legacy encoding", () => {
+	const parameters = {
+		type: "object", required: ["pattern"],
+		properties: {
+			pattern: { type: "string", minLength: 1 },
+			exclude: { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }], description: "Paths to skip" },
+			limit: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+		},
+	};
+	const context = normalizeContext({ tools: [{ ...tool, name: "grep", parameters }], messages: [user()] });
+	const before = structuredClone(context);
+	for (const runtimeId of ["claude-sonnet-5-5-low", "claude-opus-5-5-high"]) {
+		const claude = { ...model, id: runtimeId.replace(/-(low|high)$/, "") };
+		const declaration = buildRequest(claude, context, undefined, { runtimeId, modelEnum: "MODEL_SYNTHETIC_CLAUDE", thinkingLevel: "LOW" }, identity)
+			.request.tools[0]!.functionDeclarations[0]!;
+		assert.deepEqual(Object.keys(declaration).sort(), ["description", "name", "parametersJsonSchema"]);
+		assert.deepEqual(declaration.parametersJsonSchema, parameters);
+		// The payload owns its copy: mutating it must not reach the transcript.
+		(declaration.parametersJsonSchema as { required: string[] }).required.push("mutated");
+	}
+	for (const selected of [route, { runtimeId: "gpt-oss-120b-medium", modelEnum: "MODEL_SYNTHETIC_GPT", thinkingLevel: "MEDIUM" } as RequestRoute]) {
+		const declaration = buildRequest(model, context, undefined, selected, identity).request.tools[0]!.functionDeclarations[0]!;
+		assert.equal(declaration.parametersJsonSchema, undefined);
+		assert.deepEqual(declaration.parameters, uppercaseSchemaTypes(parameters));
+	}
+	assert.deepEqual(context, before);
+});
+
 test("public converter retains same-model call IDs and signatures including empty text parts", () => {
 	const context = deepFreeze(roundTrip());
 	const before = structuredClone(context);

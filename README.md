@@ -66,7 +66,8 @@ The model list is fetched from Google's Cloud Code API for your account and cach
 - Credentials are stored and refreshed through Pi's own `~/.pi/agent/auth.json`. The extension never reads official CLI login files or OS keychain entries.
 - Requests go only to official Google Cloud Code endpoints (`https://daily-cloudcode-pa.googleapis.com` by default) with HTTP redirects disabled.
 - Access and refresh tokens are never written to model caches, session files, or error messages.
-- If a model, thinking level, or tool schema (`$ref` / `$dynamicRef` or `strict: "require"`) is not supported by the backend, the request fails with an explicit error instead of silently downgrading or dropping tools.
+- Claude models receive each tool's original JSON Schema (including `anyOf` unions); Gemini and GPT-OSS models receive the legacy encoding observed from the official CLI.
+- If a model, thinking level, or tool schema (`$ref` / `$dynamicRef` on Gemini and GPT-OSS models, or `strict: "require"`) is not supported by the backend, the request fails with an explicit error instead of silently downgrading or dropping tools.
 
 ## Development
 

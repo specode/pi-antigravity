@@ -231,21 +231,29 @@ export function buildRequest(
 	}
 
 	const currentTools = getCurrentTools(context.messages);
+	const usedClaude = route.runtimeId.startsWith("claude-");
 	const convertedTools = convertTools(currentTools, true, false) ?? [];
 	const declarations = convertedTools.flatMap((tool) => tool.functionDeclarations);
-	const tools = declarations.map((declaration, index) => ({
-		functionDeclarations: [{
-			...declaration,
-			// Pi 1.5.2's legacy OpenAPI sanitizer walks user name maps as keywords
-			// (and skips arrays). Restore the original schema with a position-aware
-			// traversal so named properties and literal values are not silently lost.
-			// Strip the same meta declarations, but reject references before dropping
-			// their definitions rather than sending a silently broken schema.
-			parameters: transformSchema(currentTools[index]!.parameters, true),
-		}],
-	}));
+	const tools = declarations.map((declaration, index) => {
+		const { parameters: _legacy, ...base } = declaration;
+		return {
+			functionDeclarations: [usedClaude
+				// The Claude bridge rejects the legacy OpenAPI encoding of unions
+				// (anyOf, in either type case) as invalid draft 2020-12, but accepts
+				// the original JSON Schema unchanged; verified live for Sonnet.
+				? { ...base, parametersJsonSchema: JSON.parse(JSON.stringify(currentTools[index]!.parameters)) as unknown }
+				: {
+					...base,
+					// Pi 1.5.2's legacy OpenAPI sanitizer walks user name maps as keywords
+					// (and skips arrays). Restore the original schema with a position-aware
+					// traversal so named properties and literal values are not silently lost.
+					// Strip the same meta declarations, but reject references before dropping
+					// their definitions rather than sending a silently broken schema.
+					parameters: transformSchema(currentTools[index]!.parameters, true),
+				}],
+		};
+	});
 	const step = identity.step ?? Math.max(0, contents.length - 1);
-	const usedClaude = route.runtimeId.startsWith("claude-");
 	const payload: CliRequest = {
 		project: identity.projectId,
 		model: route.runtimeId,

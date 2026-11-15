@@ -66,7 +66,8 @@ pi install /path/to/pi-antigravity
 - 凭据仅通过 Pi 自身的 `~/.pi/agent/auth.json` 存储和刷新，不读取官方 CLI 的登录文件或系统钥匙串。
 - 请求仅发往 Google Cloud Code 官方接口（默认 `https://daily-cloudcode-pa.googleapis.com`），并禁用 HTTP 重定向。
 - 访问令牌和刷新令牌不会写入模型缓存、会话文件或报错信息。
-- 当请求的模型、推理档位或工具 Schema（如 `$ref` / `$dynamicRef` 或 `strict: "require"`）不被服务端支持时，直接报错提示，不会暗中降级模型档位或丢弃工具。
+- Claude 模型直接收到各工具的原始 JSON Schema（包括 `anyOf` 联合类型）；Gemini 与 GPT-OSS 模型使用从官方 CLI 观测到的旧编码。
+- 当请求的模型、推理档位或工具 Schema（Gemini 与 GPT-OSS 模型上的 `$ref` / `$dynamicRef`，或 `strict: "require"`）不被服务端支持时，直接报错提示，不会暗中降级模型档位或丢弃工具。
 
 ## 本地开发
 
