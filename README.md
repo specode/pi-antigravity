@@ -2,9 +2,7 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
-A [Pi](https://github.com/earendil-works/pi-mono) extension that registers the Antigravity (`antigravity`) subscription chat provider using the official agy CLI HTTP protocol.
-
-It connects directly to Google's Cloud Code API with your Antigravity subscription and reuses Pi's native OAuth storage, model catalog, tool execution, and session management—without running the official CLI binary, an ACP bridge, or a secondary agent loop.
+A [Pi](https://github.com/earendil-works/pi-mono) extension that adds the Antigravity (`antigravity`) provider so you can use Gemini, Claude, and GPT-OSS models with your Google Antigravity subscription.
 
 ## Installation
 
@@ -30,43 +28,45 @@ pi install /path/to/pi-antigravity
 
 Run `/reload` or restart Pi after installing.
 
-If another package registering the `antigravity` provider ID (such as `pi-antigravity`) is installed, remove it first with `pi remove npm:pi-antigravity`. Only one `antigravity` provider should be loaded at a time. Existing Pi OAuth credentials in `~/.pi/agent/auth.json` are reused as-is.
+If another package registering the `antigravity` provider is already installed (such as `pi-antigravity`), remove it first with `pi remove npm:pi-antigravity`. Only one `antigravity` provider should be installed at a time. Existing Antigravity credentials in `~/.pi/agent/auth.json` continue to work without signing in again.
 
 ## Usage
 
-1. Run `/login`, choose `Sign in with an account` → `Antigravity` (`Sign in with Google (Antigravity subscription)`), and open the authorization URL in your browser.
-2. After signing in with Google, click **Copy to Clipboard** on the Antigravity page and paste the authorization code into Pi. Use the code from this login attempt, not the address bar URL—the page removes its query parameters. A complete callback URL containing `code` and `state` is also accepted.
-3. Run `/model` to select an `antigravity` model and adjust its thinking effort as needed.
+1. Run `/login`, pick `Sign in with an account` → `Antigravity`, and open the authorization URL in your browser.
+2. Sign in with Google, click **Copy to Clipboard** on the Antigravity callback page, and paste the `4/...` authorization code into Pi. (Do not copy the browser address bar URL, as the page strips its query parameters after loading; a full callback URL with `code` and `state` is also accepted if copied before redirect cleanup.)
+3. Run `/model` to pick an `antigravity` model and adjust its thinking effort.
 
-### Model Discovery and Routing
+### Models
 
-| Aspect | Behavior |
-| --- | --- |
-| Catalog discovery | Calls `loadCodeAssist` and `fetchAvailableModels`, exposing curated chat models (`agentModelSorts` / `recommended`) and filtering out internal placeholders and image models |
-| Thinking effort | Groups explicit `-low`, `-medium`, and `-high` runtime suffixes under one public model ID and maps the selected effort to `generationConfig.thinkingConfig`; unsupported effort levels fail explicitly without silent downgrades |
-| Offline cache | Saves the last successful catalog per account in Pi's `models-store.json` (4-hour refresh TTL); restores cached models on offline startup and retains them if a refresh fails |
-| Account isolation | Binds cached models to the authenticated account (`email` or derived `ownershipId`), `projectId`, and official endpoint; switching accounts hides the previous catalog |
-| Token usage and cost | Populates prompt, cached, output, and thinking token counts from stream metadata; sets cost fields to `0` (unpriced subscription usage, not free API billing) |
+The model list is fetched from Google's Cloud Code API for your account and cached in `~/.pi/agent/models-store.json` (refreshed every 4 hours, and restored from cache when starting Pi offline).
+
+| Model ID | Name | Thinking levels | Context | Max output | Images |
+| --- | --- | --- | --- | --- | --- |
+| `gemini-4-argon` | Gemini 4 Argon | `low`, `medium`, `high` | 1M | 65.5K | Yes |
+| `gemini-4-hydrogen` | Gemini 4 Hydrogen | `low`, `medium`, `high` | 1M | 262.1K | Yes |
+| `gemini-3.8-flash` | Gemini 3.8 Flash | `low`, `medium`, `high` | 1M | 65.5K | Yes |
+| `claude-opus-5-5` | Claude Opus 5.5 | `low`, `medium`, `high` | 1M | 128K | Yes |
+| `claude-sonnet-5-5` | Claude Sonnet 5.5 | `low`, `medium`, `high` | 1M | 128K | Yes |
+| `gpt-oss-120b` | GPT-OSS 120B | `medium` | 131.1K | 32.8K | No |
+
+### Notes
+
+- **Chat and tool calling only**: This extension registers the `antigravity` chat provider. It does not add image generation, web search/fetch tools, multi-account rotation, or a quota UI.
+- **Token usage and cost**: Prompt, cached, output, and thinking token counts are recorded on each turn. Cost fields are set to `0` because requests use your subscription quota rather than per-token API billing.
+- **Default system prompt compatibility**: Google's backend rejects Pi's default two-sentence system prompt opening with `429 RESOURCE_EXHAUSTED`. When sending a request, the extension replaces only that default opening line with `You are a coding agent helping the user with their project.` Your `AGENTS.md`, custom system prompts, user messages, and session files are not modified.
+- **Existing Cloud Code project required**: Your Google account must already have an active Antigravity / Cloud Code Assist project. Automatic GCP project creation and enterprise endpoints are not supported.
 
 ### Companion Extensions
 
-- **[`@specode/pi-subscription-usage`](https://github.com/specode/pi-subscription-usage)**: Displays Antigravity subscription quota pools (Gemini, Claude & GPT, and Gemini 4 Argon) in the footer status bar and via `/usage`. This provider preserves the `antigravity` provider ID, official Google endpoint, and `{ token, projectId, email }` credential bridge expected by `pi-subscription-usage`.
-- **[`@specode/pi-last-model-effort`](https://github.com/specode/pi-last-model-effort)**: Remembers the thinking effort you last selected for each Antigravity model and restores it across model switches and new TUI sessions.
-
-## Protocol and Boundaries
-
-- **Official CLI HTTP alignment**: Targets consumer Antigravity subscriptions (`https://daily-cloudcode-pa.googleapis.com` by default; requires an existing Cloud Code Assist project, with no enterprise routing or automatic GCP project onboarding). Sends chat requests to `/v1internal:streamGenerateContent?alt=sse` with the `antigravity/cli/1.5.9` (build `1021519450`) client identity, host OS/architecture, `agent` request envelope, trajectory labels, and empty-seed 64-bit FNV-1a `sessionId`.
-- **Public Pi converters and tool loop**: Resolves `@earendil-works/pi-ai`'s public Google message and tool converters through host package exports, preserving `thoughtSignature` (including signed empty text parts), paired tool-call IDs, and the verified `gemini-3.8-flash-low` function-response role adjustment. Tool schema types are uppercased only at JSON Schema keyword positions without altering property names or literal values; unsupported `$ref` / `$dynamicRef` schemas or `strict: "require"` contracts fail explicitly instead of silently dropping tools.
-- **Targeted system prompt rewrite**: Rewrites only Pi's exact default two-sentence opening in the serialized request to `You are a coding agent helping the user with their project.` so the backend does not reject the default opening with `429 RESOURCE_EXHAUSTED`. User messages, session files, project rules, and custom prompts are never modified.
-- **Focused scope**: Provides text chat, coding, and tool calling only. Does not include image generation/editing, web search/fetch tools, multi-account rotation, credit overage, background warming, or a built-in quota UI.
-- **Predictable transport**: Makes a single HTTP request per turn with separate response-header (30s) and stream-idle (120s) timeouts. Never performs hidden retries or silent model, effort, or endpoint failover.
+- **[`@specode/pi-subscription-usage`](https://github.com/specode/pi-subscription-usage)**: Shows your Antigravity subscription quota (Gemini, Claude and GPT, and Gemini 4 Argon pools) in the footer status bar and via `/usage`. Works out of the box with the `antigravity` login from this extension.
+- **[`@specode/pi-last-model-effort`](https://github.com/specode/pi-last-model-effort)**: Remembers the thinking effort you last picked for each model and restores it when switching models or starting a new TUI session.
 
 ## Privacy and Safety
 
-- Credentials are managed solely by Pi's native OAuth store (`auth.json`). The extension never reads, copies, or migrates official CLI credential files or OS keychain entries.
-- Requests are sent only to allowlisted official HTTPS origins (`https://daily-cloudcode-pa.googleapis.com` by default, plus `https://cloudcode-pa.googleapis.com` and `https://daily-cloudcode-pa.sandbox.googleapis.com`) with HTTP redirects disabled (`redirect: "error"`).
-- OAuth sign-in accepts the authorization code copied from the official page and exchanges it using this login attempt's independent S256 PKCE verifier. The copied code contains no `state`, so that path relies on the token endpoint's PKCE validation. Complete `https://antigravity.google/oauth-callback` URLs are also accepted, with strict origin/path checks and constant-time `state` validation; invalid URLs never fall back to bare-code parsing.
-- OAuth and streaming error messages expose only allowlisted error codes or bounded diagnostic metadata and never include access or refresh tokens.
+- Credentials are stored and refreshed through Pi's own `~/.pi/agent/auth.json`. The extension never reads official CLI login files or OS keychain entries.
+- Requests go only to official Google Cloud Code endpoints (`https://daily-cloudcode-pa.googleapis.com` by default) with HTTP redirects disabled.
+- Access and refresh tokens are never written to model caches, session files, or error messages.
+- If a model, thinking level, or tool schema (`$ref` / `$dynamicRef` or `strict: "require"`) is not supported by the backend, the request fails with an explicit error instead of silently downgrading or dropping tools.
 
 ## Development
 
@@ -74,17 +74,15 @@ If another package registering the `antigravity` provider ID (such as `pi-antigr
 # Install dependencies
 npm ci
 
-# Run typecheck, offline tests, isolated packed-extension smoke test, and package check
-npm run check
-
-# Run offline unit and integration tests only
+# Run tests
 npm test
 
-# Validate a published npm version in an isolated Pi environment with network blocked
-npm run smoke -- @specode/pi-antigravity@0.1.2
-```
+# Run typecheck, tests, isolated packed-extension smoke check, and package check
+npm run check
 
-Verification covers strict type checking, offline unit/integration suites (including local Pi `read`-tool execution against mocked Gemini/Claude streams), static checks against official agy CLI `1.5.9`, and bounded consumer-account testing on Pi `1.5.2`; live browser `/login` and exhaustive model/account combinations have not all been individually verified. See [AGENTS.md](./AGENTS.md) for architecture and verification boundaries, and [`test/fixtures/agy-cli-1.5.9/manifest.json`](./test/fixtures/agy-cli-1.5.9/manifest.json) for redacted protocol research fixtures.
+# Load the extension directly in Pi without installing
+pi --no-extensions --offline -e ./src/index.ts --list-models
+```
 
 ## License
 
