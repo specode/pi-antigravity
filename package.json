@@ -1,0 +1,49 @@
+{
+  "name": "@specode/pi-antigravity",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Independent Antigravity subscription chat provider for Pi, aligned with the official agy CLI HTTP protocol.",
+  "license": "MIT",
+  "author": "Specode",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/specode/pi-antigravity.git"
+  },
+  "homepage": "https://github.com/specode/pi-antigravity#readme",
+  "bugs": {
+    "url": "https://github.com/specode/pi-antigravity/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "antigravity",
+    "oauth",
+    "provider",
+    "subscription"
+  ],
+  "files": ["src", "README.md", "README.zh-CN.md", "LICENSE", "THIRD_PARTY_NOTICES.md"],
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "smoke": "tsx scripts/smoke.mjs",
+    "pack:check": "npm pack --dry-run",
+    "check": "npm run typecheck && npm test && npm run smoke && npm run pack:check",
+    "prepublishOnly": "npm run check"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "1.5.2",
+    "@earendil-works/pi-coding-agent": "1.5.2",
+    "@types/node": "^26.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.0"
+  },
+  "publishConfig": { "access": "public" },
+  "pi": { "extensions": ["./src/index.ts"] },
+  "engines": { "node": ">=22.19.0" }
+}

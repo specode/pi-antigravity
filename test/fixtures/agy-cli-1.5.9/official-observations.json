@@ -1,0 +1,93 @@
+{
+  "client": "Google Antigravity CLI",
+  "version": "1.5.9",
+  "buildCl": 1021519450,
+  "platform": "darwin/arm64",
+  "method": "Official CLI with CLOUD_CODE_URL pointing to a loopback forwarding proxy; no ACP server or ACP protocol used",
+  "upstream": "https://daily-cloudcode-pa.googleapis.com",
+  "generationRequests": 5,
+  "httpStatuses": [
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "scenarios": [
+    {
+      "model": "gemini-3.8-flash-low",
+      "effort": "low",
+      "purpose": "single-turn text",
+      "requests": 1,
+      "result": "OK"
+    },
+    {
+      "model": "gemini-3.8-flash-low",
+      "effort": "low",
+      "purpose": "read_file and continuation",
+      "requests": 2,
+      "result": "AGY_CAPTURE_TOOL_OK"
+    },
+    {
+      "model": "claude-sonnet-5-5-low",
+      "effort": "low",
+      "purpose": "read_file and continuation",
+      "requests": 2,
+      "result": "AGY_CAPTURE_TOOL_OK"
+    }
+  ],
+  "observations": {
+    "userAgent": "antigravity/cli/1.5.9 (aidev_client; os_type=darwin; arch=arm64; cl=1021519450; auth_method=consumer)",
+    "outerKeys": [
+      "project",
+      "requestId",
+      "model",
+      "userAgent",
+      "requestType",
+      "request"
+    ],
+    "requestType": "agent",
+    "requestIdShape": "agent/<uuid>/<13-digit timestamp>/<uuid>/<step>",
+    "thinkingConfig": {
+      "includeThoughts": true,
+      "thinkingLevel": "LOW"
+    },
+    "toolSchemaField": "parameters",
+    "toolSchemaTypes": "Uppercase protobuf schema types",
+    "toolContainerShape": "One function declaration per tools[] element in these samples",
+    "labels": [
+      "cascade_id",
+      "root_cascade_id",
+      "trajectory_id",
+      "request_id",
+      "last_step_index",
+      "model_enum",
+      "used_claude",
+      "used_claude_conservative",
+      "used_non_gemini_model"
+    ],
+    "lastExecutionId": "Absent in all five samples, including both tool continuations",
+    "functionCallIds": "Present and retained in both Gemini and Claude continuations",
+    "toolResultRole": {
+      "gemini-3.8-flash-low": "model",
+      "claude-sonnet-5-5-low": "user"
+    },
+    "sessionId": "Same negative decimal int64-shaped string across the three independent CLI runs; derivation and lifetime not determined",
+    "geminiSignature": "Signature retained on the function-call part; final signatures can arrive with an empty text part"
+  },
+  "limitations": [
+    "Only low effort and the two named runtime models were exercised",
+    "Native endpoint selection was overridden by CLOUD_CODE_URL, not verified",
+    "The proxy changes transport framing and does not establish TLS-level client equivalence",
+    "No image generation, model switching, failed-request retry, concurrent calls, or conversation resume was exercised",
+    "Official prompts were used; acceptance of Pi prompts and the reported Pi false-429 cause remain unverified",
+    "Request identity generation rules cannot be inferred from the redacted shapes alone",
+    "These fixtures describe observations, not a replayable authenticated request or proof that every recorded field is required"
+  ],
+  "artifacts": [
+    "official-capture.json"
+  ],
+  "redaction": "Authorization and non-allowlisted header values removed; prompt text, tool descriptions, credentials, account/project identifiers, signatures, and other arbitrary string values replaced with length and truncated SHA-256 metadata",
+  "followupVerification": "verification.json",
+  "scopeNote": "This records the first capture batch only. Consult verification.json for later findings; some original limitations were subsequently resolved."
+}

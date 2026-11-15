@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "capturedOn": "2026-11-15",
+  "purpose": "Developer handoff: official CLI observations and direct-protocol feasibility verification, not production plugin acceptance",
+  "readFirst": "../../../AGENTS.md",
+  "environment": {
+    "pi": "1.5.2",
+    "node": "26.13.1",
+    "os": "darwin",
+    "arch": "arm64",
+    "accountClass": "consumer subscription",
+    "referencePackages": {
+      "pi-antigravity": "0.14.0",
+      "@specode/pi-subscription-usage": "1.5.0",
+      "@specode/pi-subscription-image": "1.1.2"
+    }
+  },
+  "officialClient": {
+    "version": "1.5.9",
+    "buildCl": 1021519450,
+    "installerUrl": "https://antigravity.google/cli/install.sh",
+    "manifestUrl": "https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/darwin_arm64.json",
+    "downloadUrl": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.5.9-4515810895593472/darwin-arm/cli_mac_arm64.tar.gz",
+    "archiveSha512": "690cd6a5a5fdb23564fb1b14f7f6ae368fa3636b7630f56c574a6dfc0e2791a0e5b93d6515be1650c8a268cfb28440e1b9cbaa1c5b85aa762ab25b51c1fccda5",
+    "binaryIncluded": false,
+    "usesAcp": false
+  },
+  "batches": [
+    {
+      "id": "official-cli",
+      "capture": "official-capture.json",
+      "summary": "official-observations.json",
+      "generationRequests": 5,
+      "http200": 5,
+      "note": "All requests in this batch were emitted by the official CLI. Original limitations describe this batch only; subsequent checks appear in verification.json."
+    },
+    {
+      "id": "followup-verification",
+      "capture": "verification-capture.json",
+      "summary": "verification.json",
+      "generationRequests": 12,
+      "http200": 10,
+      "http429": 2,
+      "imageGenerations": 1,
+      "note": "One official CLI baseline plus eleven named direct-protocol probes. The two 429 requests are deliberate original-Pi-prompt controls. The image request is not an official CLI image-tool capture."
+    }
+  ],
+  "redaction": {
+    "authorizationHeaders": "Removed before recording",
+    "arbitraryStrings": "Many values replaced with objects containing redacted=true, length and a truncated SHA-256 digest; selected identifiers also have a shape",
+    "intendedUse": "Structural comparison and construction of separate synthetic regression inputs",
+    "replayable": false,
+    "containsRawPrompts": false,
+    "containsCredentials": false,
+    "digestCaution": "Not all digests are full SHA-256. A digest is not a usable original identifier, thought signature, credential, or wire value."
+  },
+  "verificationLimits": [
+    "Success establishes the tested application-layer protocol, not TLS/client-fingerprint equivalence or support for every account/model/version",
+    "Full provider registration, UI integration, concurrent/resumed sessions, cancellation and malformed-stream handling still require implementation and tests",
+    "Installed extension prompts and skill catalogues were not part of the Pi prompt probes",
+    "Current image evidence covers one reference-image request; image tool routing and pure text-to-image were not independently exercised",
+    "Past quota authorization does not authorize new unbounded live tests"
+  ],
+  "artifacts": [
+    {
+      "path": "image-result.jpg",
+      "bytes": 134142,
+      "sha256": "a8e49719feee105d9d781c9ce01bdac0306ea017b201f6ebfcd1e3f769492cc2"
+    },
+    {
+      "path": "official-capture.json",
+      "bytes": 213180,
+      "sha256": "9874d5348dc5e77c3837ce065a6762eea2eee13d05cce6f6fafa9f2c72b5f9f1"
+    },
+    {
+      "path": "official-observations.json",
+      "bytes": 3612,
+      "sha256": "b9a466d421cd88ec7061799ed189174fcacb90b4022ff41b1848cf9c581fe180"
+    },
+    {
+      "path": "verification-capture.json",
+      "bytes": 227979,
+      "sha256": "d97995f3a015e2e68c8eb46075efb63b603fad52cb50dbcbcc4ada69a4f25cfb"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 9642,
+      "sha256": "0d04e1a4cf1fbdcafc9d26c667bce5a368f83a78c908d32f62ce0be06927ceea"
+    }
+  ]
+}

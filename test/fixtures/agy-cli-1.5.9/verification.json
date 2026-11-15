@@ -1,0 +1,311 @@
+{
+  "scope": "Verification of a direct agy CLI-compatible Pi adapter; no ACP protocol or ACP server used; no production plugin installed or modified",
+  "client": {
+    "version": "1.5.9",
+    "ua": "antigravity/cli/1.5.9 (aidev_client; os_type=darwin; arch=arm64; cl=1021519450; auth_method=consumer)",
+    "sha512": "690cd6a5a5fdb23564fb1b14f7f6ae368fa3636b7630f56c574a6dfc0e2791a0e5b93d6515be1650c8a268cfb28440e1b9cbaa1c5b85aa762ab25b51c1fccda5"
+  },
+  "generationRequests": 12,
+  "httpStatuses": [
+    200,
+    429,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    429,
+    200
+  ],
+  "auth": {
+    "method": "Existing Pi OAuth credential copied to isolated CLI file storage; official CLI refreshed it successfully",
+    "originalPiCredentialWritten": false,
+    "keyringUsedForThisVerification": false,
+    "note": "SSH session mode selected official file-based storage; stored CLI project_id is an explicit GCP project, not the same field as Pi credential projectId"
+  },
+  "prompt": {
+    "onlyChangedField": "request.systemInstruction.parts[0].text",
+    "identicalOtherFieldsSha256": "da6bb868d37a921bc0c335b0a788859657380e83ae40018d731b4ec6f7c195d8",
+    "originalStatus": 429,
+    "neutralStatus": 200,
+    "neutralOutput": "OK",
+    "repeatResult": "Both pairs returned 429 for the original native Pi opener and 200 for the neutral opener",
+    "ruleFilesPreserved": true,
+    "fullNativeToolDescriptionsAndGuidelines": true,
+    "notIncluded": "Installed extension prompt injections, skill catalogue and real user conversation history"
+  },
+  "sessionId": {
+    "algorithm": "FNV-1a 64-bit of seed bytes, interpreted as signed int64, formatted base 10",
+    "defaultValue": "-3750763034362895579",
+    "defaultValueSha256": "cfca81ad0e596bc7af1e3c25a61acb2adcf63f27e07a3a5bc4ed097175756bc2",
+    "previousCaptureHashMatches": true,
+    "evidence": "Official hashToSessionID function static disassembly plus all previous official CLI samples; empty seed reproduces the exact recorded value",
+    "limitation": "Only the captured normal CLI path has been established to pass an empty seed; other client surfaces and special modes may supply a seed"
+  },
+  "toolRoundTrip": {
+    "models": [
+      "gemini-3.8-flash-low",
+      "claude-sonnet-5-5-low"
+    ],
+    "tool": "Pi native read",
+    "result": "AGY_PI_TOOL_OK",
+    "actualLocalToolExecuted": true,
+    "converter": "Pi 1.5.2 google-shared convertMessages / convertTools",
+    "adapters": [
+      "parameters mode; uppercase schema type values; one declaration per tools entry",
+      "Gemini function-response-only content role mapped to model for the verified CLI route",
+      "Retain function-call ids and Gemini signatures"
+    ],
+    "noWritesOrShellToolsExecuted": true
+  },
+  "extraModels": {
+    "gemini-4-argon-high": "200 OK with Pi prompt and native tool declarations",
+    "claude-opus-5-5-high": "200 OK with Pi prompt and native tool declarations"
+  },
+  "image": {
+    "model": "gemini-3.1-flash-image",
+    "mimeType": "image/jpeg",
+    "bytes": 134142,
+    "path": "image-result.jpg",
+    "referenceInput": true,
+    "aspectRatio": "16:9",
+    "subscriptionImageDecoderAccepted": true,
+    "width": 1376,
+    "height": 768,
+    "aspectRatioApproximate": true,
+    "visualCheck": "White landscape canvas with centered blue circle; red square removed"
+  },
+  "usage": {
+    "provider": "antigravity",
+    "source": "antigravity-quota",
+    "bucketCount": 5,
+    "groups": [
+      "gemini-models",
+      "claude-and-gpt-models",
+      "gemini-argon"
+    ],
+    "validPercentages": true,
+    "metrics": [
+      "plan",
+      "project"
+    ],
+    "usesUnmodifiedUsageAdapter": true
+  },
+  "endpoint": {
+    "cloudCodeUrlOverride": false,
+    "verification": "Official CLI models command completed successfully through a CONNECT-only proxy, without TLS interception",
+    "observedHost": "daily-cloudcode-pa.googleapis.com",
+    "limitedTo": "Current consumer account"
+  },
+  "remainingImplementationTests": [
+    "Full provider registration, /login integration and stream lifecycle hooks in Pi",
+    "Abort/timeout, malformed SSE, retry and failed/resumed/concurrent conversation cases",
+    "Installed extensions and skills, additional model efforts and larger contexts",
+    "Subscription image tool provider enum/auto routing/save/render integration",
+    "Image generation request was accepted live, but a native CLI image-tool request was not captured for byte-for-byte comparison"
+  ],
+  "results": [
+    {
+      "name": "pi-original",
+      "model": "gemini-3.8-flash-low",
+      "httpStatus": 429,
+      "elapsedMs": 1170,
+      "text": "",
+      "finishReasons": [],
+      "functionCalls": [],
+      "imageCount": 0,
+      "error": "{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource has been exhausted (e.g. check quota).\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"
+    },
+    {
+      "name": "pi-neutral",
+      "model": "gemini-3.8-flash-low",
+      "httpStatus": 200,
+      "elapsedMs": 2468,
+      "text": "OK",
+      "finishReasons": [
+        "STOP"
+      ],
+      "functionCalls": [],
+      "imageCount": 0,
+      "usage": {
+        "promptTokenCount": 8602,
+        "candidatesTokenCount": 1,
+        "totalTokenCount": 8603
+      },
+      "modelVersion": "gemini-3.8-flash-n"
+    },
+    {
+      "name": "gemini-3.8-flash-pi-tool",
+      "model": "gemini-3.8-flash-low",
+      "httpStatus": 200,
+      "elapsedMs": 3775,
+      "text": "",
+      "finishReasons": [
+        "STOP"
+      ],
+      "functionCalls": [
+        {
+          "name": "read",
+          "hasId": true,
+          "hasSignature": true
+        }
+      ],
+      "imageCount": 0,
+      "usage": {
+        "promptTokenCount": 4516,
+        "candidatesTokenCount": 17,
+        "totalTokenCount": 4533
+      },
+      "modelVersion": "gemini-3.8-flash-n"
+    },
+    {
+      "name": "gemini-3.8-flash-pi-tool-continuation",
+      "model": "gemini-3.8-flash-low",
+      "httpStatus": 200,
+      "elapsedMs": 2111,
+      "text": "AGY_PI_TOOL_OK",
+      "finishReasons": [
+        "STOP"
+      ],
+      "functionCalls": [],
+      "imageCount": 0,
+      "usage": {
+        "promptTokenCount": 4553,
+        "candidatesTokenCount": 8,
+        "totalTokenCount": 4561,
+        "cachedContentTokenCount": 2479
+      },
+      "modelVersion": "gemini-3.8-flash-n"
+    },
+    {
+      "name": "claude-sonnet-5-5-pi-tool",
+      "model": "claude-sonnet-5-5-low",
+      "httpStatus": 200,
+      "elapsedMs": 1720,
+      "text": "",
+      "finishReasons": [
+        "STOP"
+      ],
+      "functionCalls": [
+        {
+          "name": "read",
+          "hasId": true,
+          "hasSignature": false
+        }
+      ],
+      "imageCount": 0,
+      "usage": {
+        "promptTokenCount": 7330,
+        "candidatesTokenCount": 51,
+        "totalTokenCount": 7381
+      },
+      "modelVersion": "claude-sonnet-5-5-low"
+    },
+    {
+      "name": "claude-sonnet-5-5-pi-tool-continuation",
+      "model": "claude-sonnet-5-5-low",
+      "httpStatus": 200,
+      "elapsedMs": 1293,
+      "text": "AGY_PI_TOOL_OK",
+      "finishReasons": [
+        "STOP"
+      ],
+      "functionCalls": [],
+      "imageCount": 0,
+      "usage": {
+        "promptTokenCount": 7409,
+        "candidatesTokenCount": 16,
+        "totalTokenCount": 7425,
+        "cachedContentTokenCount": 7205
+      },
+      "modelVersion": "claude-sonnet-5-5-low"
+    },
+    {
+      "name": "image-with-reference",
+      "model": "gemini-3.1-flash-image",
+      "httpStatus": 200,
+      "elapsedMs": 9010,
+      "text": "",
+      "finishReasons": [
+        "STOP"
+      ],
+      "functionCalls": [],
+      "imageCount": 1,
+      "usage": {
+        "promptTokenCount": 307,
+        "candidatesTokenCount": 1307,
+        "totalTokenCount": 1614
+      },
+      "modelVersion": "gemini-3.1-flash-image"
+    },
+    {
+      "name": "gemini-4-argon-high-pi-prompt",
+      "model": "gemini-4-argon-high",
+      "httpStatus": 200,
+      "elapsedMs": 6206,
+      "text": "OK",
+      "finishReasons": [
+        "STOP"
+      ],
+      "functionCalls": [],
+      "imageCount": 0,
+      "usage": {
+        "promptTokenCount": 4425,
+        "candidatesTokenCount": 5,
+        "totalTokenCount": 4453,
+        "thoughtsTokenCount": 23
+      },
+      "modelVersion": "gemini-4-argon-trial"
+    },
+    {
+      "name": "claude-opus-5-5-high-pi-prompt",
+      "model": "claude-opus-5-5-high",
+      "httpStatus": 200,
+      "elapsedMs": 1633,
+      "text": "OK",
+      "finishReasons": [
+        "STOP"
+      ],
+      "functionCalls": [],
+      "imageCount": 0,
+      "usage": {
+        "promptTokenCount": 7298,
+        "candidatesTokenCount": 4,
+        "totalTokenCount": 7302
+      },
+      "modelVersion": "claude-opus-5-5-high"
+    },
+    {
+      "name": "pi-full-exact-control-original",
+      "model": "gemini-3.8-flash-low",
+      "httpStatus": 429,
+      "elapsedMs": 1100,
+      "text": "",
+      "finishReasons": [],
+      "functionCalls": [],
+      "imageCount": 0,
+      "error": "{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource has been exhausted (e.g. check quota).\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"
+    },
+    {
+      "name": "pi-full-exact-control-neutral",
+      "model": "gemini-3.8-flash-low",
+      "httpStatus": 200,
+      "elapsedMs": 2197,
+      "text": "OK",
+      "finishReasons": [
+        "STOP"
+      ],
+      "functionCalls": [],
+      "imageCount": 0,
+      "usage": {
+        "promptTokenCount": 4491,
+        "candidatesTokenCount": 1,
+        "totalTokenCount": 4492
+      },
+      "modelVersion": "gemini-3.8-flash-n"
+    }
+  ]
+}
