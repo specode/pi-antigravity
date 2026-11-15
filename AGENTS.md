@@ -9,10 +9,10 @@
 - 独立 npm 包，目录为 `pi-plugins/pi-antigravity`，provider id 保留 `antigravity`。代码仓库为 `https://github.com/specode/pi-antigravity`，origin 使用用户提供的 `git@github.com:specode/pi-antigravity.git`；首次提交及推送已获明确授权。
 - Pi 继续管理工具执行、会话、凭据保存、UI 和主循环；本包只提供必要的认证与协议适配。
 - 范围收敛为文本聊天／编码及工具调用 provider；额度由相邻的 `pi-subscription-usage` 负责。用户已明确取消 Antigravity 生图计划，不在本包或相邻 image 插件新增 Antigravity 生图／编辑后端，也不继续生图测试。现有 Codex/Grok 生图插件不在本次修改范围。
-- 允许在发往后端的请求中精确改写 Pi 默认开头两句；不改写会话记录、用户消息、规则文件或任意包含 `pi` 的文本。
+- 用户已明确授权：在发往后端的请求中，把 Pi 内置的固定系统提示词文案（开头、内置工具简介与规则、文档指引、项目规则与技能列表标题）逐句精确改写为不提及 Pi 的原创等义文案，实现在 `src/prompt.ts`。不改写会话记录、用户消息、AGENTS／规则文件内容、技能与其他扩展的内容、路径、环境变量名或工具 schema；不照抄官方 agy 的专有提示词。用户已知悉这是规避后端对第三方客户端的识别，账号风险由其自行承担。
 - 不需要搜索、网页读取、多账号切换、企业版路由、额度 UI、静默降级、自动超额 credits、后台预热和其他 harness/fork 兼容层。
 
-**当前状态：聊天 provider 已替换本机旧包并获用户实测确认；GitHub 与 npm 均公开，当前版本 0.1.2 已通过 GitHub Release／OIDC 发布并验证实际 registry 包加载；已更新本机 npm 安装，修复官方页面授权码无法粘贴登录的问题，修复后的真实登录仍待用户验收。** `src/index.ts` 注册 Pi 原生 provider；`auth.ts`、`catalog.ts`、`request.ts`、`stream.ts` 与 `client.ts` 分别负责认证、目录、转换、流及受控 HTTP。已安装本项目开发依赖，`npm run check` 覆盖严格类型检查、138 项离线测试（含本次登录修复回归）、隔离的真实 Pi 扩展加载和打包预检。mock Gemini／Claude 响应驱动了真实本地 Pi read 工具闭环；这些不是新的真实后端调用。已通过 `pi remove npm:pi-antigravity` 卸载旧 0.14.0，并通过 `pi install` 将本项目目录加入全局 packages；修改前已备份 settings，登录凭据和旧账号数据保持字节不变。GitHub 仓库已完成首次提交及推送，CI 通过。npm 包已移除 `private` 标记并以 `publishConfig.access: public` 配置，首次 0.1.0 公开发布后发现干净安装缺少 Pi 子路径解析；0.1.1 已修复，只通过公开 Node／Pi API 及宿主 package exports 加载 Google 转换器，并使用 root 导出的 transcript／事件流辅助函数，不修改 Pi loader、不捆绑或复制 Pi。Trusted Publishing 已绑定本仓库与 `npm-publish.yml`；`v0.1.1` Release 的校验及 OIDC 发布 job 均成功，registry 匿名查询／下载与 `npm run smoke -- @specode/pi-antigravity@0.1.1` 均通过，0.1.1 发布时 latest 为 0.1.1，access 为 public。本次 `v0.1.2` Release 的校验与 OIDC 发布及 push CI 也均成功；registry 匿名版本查询、install metadata 的 latest=0.1.2、下载和 `npm run smoke -- @specode/pi-antigravity@0.1.2` 已通过。发布验证时本机源码安装保持不变，没有再添加同 id 的 npm provider；本次登录排查只读核实当前全局配置已改为 `npm:@specode/pi-antigravity`，源码修复不会自动作用于该 npm 安装。用户已明确授权发布 0.1.2 并更新本机，现已通过 `pi update npm:@specode/pi-antigravity` 从 0.1.1 升至 0.1.2，核实安装包的解析器／提示已更新，`auth.json` 与 `settings.json` 均保持字节不变；更新前的 settings 备份在系统临时目录，本项目不依赖其存活。真实 `loadCodeAssist`／`fetchAvailableModels` 查询成功并以 Pi 标准模型存储持久化 6 个公开模型，安装后的 CLI 已验证离线恢复；安装切换本身未发起生成请求；后续经独立授权完成了本节 6.2 所述 6 次 429 对照。已打开的 Pi 会话需 `/reload` 才更新扩展和项目规则。用户随后反馈实际测试无问题，本机切换及 429 修复记为用户实测通过；反馈未明确覆盖具体模型、工具续轮、首次登录、恢复或取消，不扩张为这些场景均已验收。首次浏览器登录及真实完整工具闭环／会话 UI 的逐项验收仍未单独确认；Antigravity 生图已取消，不再列为待办；不能把目录查询或小输出对照写成完整生成验收。Astra（`gpt-6-astra`）已独立审查并复审：无 email 凭据自动刷新导致目录失效的 P2 已修复，133 项测试及隔离 smoke 重跑通过，未发现其他具体问题；这不是线上稳定性保证。
+**当前状态：聊天 provider 已替换本机旧包并获用户实测确认；源码已新增 Pi 内置系统提示词适配（见 6.2，未提交、未发布，本机 npm 安装的 0.1.2 尚不含此改动）；GitHub 与 npm 均公开，当前版本 0.1.2 已通过 GitHub Release／OIDC 发布并验证实际 registry 包加载；已更新本机 npm 安装，修复官方页面授权码无法粘贴登录的问题，修复后的真实登录仍待用户验收。** `src/index.ts` 注册 Pi 原生 provider；`auth.ts`、`catalog.ts`、`request.ts`、`prompt.ts`、`stream.ts` 与 `client.ts` 分别负责认证、目录、转换、系统提示词适配、流及受控 HTTP。已安装本项目开发依赖，`npm run check` 覆盖严格类型检查、149 项离线测试（含登录修复回归与系统提示词适配）、隔离的真实 Pi 扩展加载和打包预检。mock Gemini／Claude 响应驱动了真实本地 Pi read 工具闭环；这些不是新的真实后端调用。已通过 `pi remove npm:pi-antigravity` 卸载旧 0.14.0，并通过 `pi install` 将本项目目录加入全局 packages；修改前已备份 settings，登录凭据和旧账号数据保持字节不变。GitHub 仓库已完成首次提交及推送，CI 通过。npm 包已移除 `private` 标记并以 `publishConfig.access: public` 配置，首次 0.1.0 公开发布后发现干净安装缺少 Pi 子路径解析；0.1.1 已修复，只通过公开 Node／Pi API 及宿主 package exports 加载 Google 转换器，并使用 root 导出的 transcript／事件流辅助函数，不修改 Pi loader、不捆绑或复制 Pi。Trusted Publishing 已绑定本仓库与 `npm-publish.yml`；`v0.1.1` Release 的校验及 OIDC 发布 job 均成功，registry 匿名查询／下载与 `npm run smoke -- @specode/pi-antigravity@0.1.1` 均通过，0.1.1 发布时 latest 为 0.1.1，access 为 public。本次 `v0.1.2` Release 的校验与 OIDC 发布及 push CI 也均成功；registry 匿名版本查询、install metadata 的 latest=0.1.2、下载和 `npm run smoke -- @specode/pi-antigravity@0.1.2` 已通过。发布验证时本机源码安装保持不变，没有再添加同 id 的 npm provider；本次登录排查只读核实当前全局配置已改为 `npm:@specode/pi-antigravity`，源码修复不会自动作用于该 npm 安装。用户已明确授权发布 0.1.2 并更新本机，现已通过 `pi update npm:@specode/pi-antigravity` 从 0.1.1 升至 0.1.2，核实安装包的解析器／提示已更新，`auth.json` 与 `settings.json` 均保持字节不变；更新前的 settings 备份在系统临时目录，本项目不依赖其存活。真实 `loadCodeAssist`／`fetchAvailableModels` 查询成功并以 Pi 标准模型存储持久化 6 个公开模型，安装后的 CLI 已验证离线恢复；安装切换本身未发起生成请求；后续经独立授权完成了本节 6.2 所述 6 次 429 对照。已打开的 Pi 会话需 `/reload` 才更新扩展和项目规则。用户随后反馈实际测试无问题，本机切换及 429 修复记为用户实测通过；反馈未明确覆盖具体模型、工具续轮、首次登录、恢复或取消，不扩张为这些场景均已验收。首次浏览器登录及真实完整工具闭环／会话 UI 的逐项验收仍未单独确认；Antigravity 生图已取消，不再列为待办；不能把目录查询或小输出对照写成完整生成验收。Astra（`gpt-6-astra`）已独立审查并复审：无 email 凭据自动刷新导致目录失效的 P2 已修复，133 项测试及隔离 smoke 重跑通过，未发现其他具体问题；这不是线上稳定性保证。
 
 本文件是本项目唯一开发入口。用户说明维护中英文 README 并顶部互链；后续以实现和测试更新这里，不新增分散的设计过程／历史流水账。
 
@@ -27,7 +27,7 @@
 5. **传输与响应**：受控 HTTP 请求 → SSE 解析 → Pi 事件流、签名、用量和错误。
 6. **独立插件协作**：usage 通过 provider 凭据查询；不增加 Antigravity 生图能力，不改动现有 Codex/Grok 生图行为。
 
-可按职责组织为 `src/index.ts`、`auth.ts`、`catalog.ts`、`request.ts`、`stream.ts`，必要时单独放置客户端版本与请求标识逻辑。不承诺代码行数，不复制上游整个实现。身份参数、模型路由、生命周期状态不是同一职责，不能都塞进一个“profile”配置框架。
+可按职责组织为 `src/index.ts`、`auth.ts`、`catalog.ts`、`request.ts`、`prompt.ts`、`stream.ts`，必要时单独放置客户端版本与请求标识逻辑。不承诺代码行数，不复制上游整个实现。身份参数、模型路由、生命周期状态不是同一职责，不能都塞进一个“profile”配置框架。
 
 生产实现只依赖 Pi 公开契约。`src/google-shared.ts` 通过公开 `getPackageDir()`、Node `findPackageJSON()` 和宿主的公开 exports 定位 Google 转换器，解决 Pi 1.5.2 未别名映射全部 `api/*` 子路径的问题；不依赖开发目录的 node_modules，不修改全局 resolver，不访问私有 API。验证阶段曾为生成真实系统提示词／执行原生 read 而引用本机 Pi 的内部模块，这些测试手法**不是生产依赖的许可**。
 
@@ -103,7 +103,7 @@ antigravity/cli/1.5.9 (aidev_client; os_type=darwin; arch=arm64; cl=1021519450; 
 
 ### 6.2 Pi 提示词与 429 对照
 
-Pi 1.5.2 的默认开头以 `src/request.ts` 中的 `PI_OPENING` 常量为准；此处不逐字引用，避免该示例随项目规则再次进入请求。
+Pi 1.5.2 的默认开头以 `src/prompt.ts` 中的 `PI_OPENING` 常量为准；此处不逐字引用，避免该示例随项目规则再次进入请求。
 
 已验证替换成：
 
@@ -113,11 +113,19 @@ You are a coding agent helping the user with their project.
 
 两组对照均为原版 429、替换后 200。最后一组保持请求 ID、工具及其他所有字段完全相同，唯一变化是 `request.systemInstruction.parts[0].text` 中上述开头。后面的全局／项目规则被保留；随后带 Pi 完整原生工具描述和规则也正常。
 
-因此：只锚定已知的默认开头整句改写，其他内容原样保留；未知自定义开头不做泛化替换。不把 system prompt 移到 user 轮，不删除技能，不注入另一套官方 agent 指令。只修改本次序列化请求，不能污染持久化 transcript。
+不把 system prompt 移到 user 轮，不删除技能，不注入另一套官方 agent 指令。只修改本次序列化请求，不能污染持久化 transcript。
 
 这证明当前样本的 429 与开头差异相关，不证明后端内部分类器的具体实现，也不意味着任意 `RESOURCE_EXHAUSTED` 都是提示词问题或都应标为不可重试。真实额度、限流、容量和格式错误须区分。
 
-本机安装后的 Argon High 排查另获授权执行 6 次受控请求，每次输出上限 256、无自动重试、不执行工具，共 3 次 429、3 次 200。当时 Argon 周额度剩余约 99.94%。完整系统提示词含 13 个工具时返回 429；保留全部工具，仅去掉项目规则则 200；中性开头加项目规则仍 429。最后一对保持请求 ID 和其他所有字段一致，仅将本节原来的逐字开头示例改为上面的源码引用，得到 429 → 200。由此修复文档自身经 `project_context` 注入已知触发文本的问题，不扩大 provider 对规则或历史的改写范围。`test/request.test.ts` 防止本文件重新嵌入该完整原句。最后一次 200 因小输出上限以 length 终止，只证明请求获接收，不等于完整回答／工具验收；也不证明后端具体检测机制。
+本机安装后的 Argon High 排查另获授权执行 6 次受控请求，每次输出上限 256、无自动重试、不执行工具，共 3 次 429、3 次 200。当时 Argon 周额度剩余约 99.94%。完整系统提示词含 13 个工具时返回 429；保留全部工具，仅去掉项目规则则 200；中性开头加项目规则仍 429。最后一对保持请求 ID 和其他所有字段一致，仅将本节原来的逐字开头示例改为上面的源码引用，得到 429 → 200。由此修复文档自身经 `project_context` 注入已知触发文本的问题。`test/request.test.ts` 与 `test/prompt.test.ts` 防止本文件重新嵌入已知触发原文。最后一次 200 因小输出上限以 length 终止，只证明请求获接收，不等于完整回答／工具验收；也不证明后端具体检测机制。
+
+**2026-11-15 第二个触发点与内置文案适配。** 用户截图会话（`~/Code/specode`，Argon High，周额度剩余约 95.7%）在开头已正确改写后仍连续 429。经授权共 16 次受控请求（输出上限 256、无自动重试、不执行工具）逐段二分：保持工具、输入和请求标识不变，完整系统提示词 429、中性一句话 200；单独保留 Pi 内置 `<docs>` 块 429，单独保留全局规则、工具规则、技能等其余区块均 200；单独保留 `<docs>` 中列出各主题对应文档的那一整行（Pi 源码 `dist/core/system-prompt.js:93`）429，完整提示词只删这一行 200。未细分到该行中的具体词语。
+
+另在隔离环境（临时 HOME／Pi 配置／`GEMINI_HOME`、文件凭据，测后已删除）实测 `@ackneal/pi-agy-bridge` 0.6.2 走官方 ACP 服务端 1.4.5：它把 Pi 完整系统提示词追加给官方提示词，含该行时服务端内部 6 次退避均 429，且桥接不向 Pi 报错而是挂起；换中性提示词则 200，经 MCP 的 Pi `read` 闭环可用。ACP 不能规避这一触发，另带来独立凭据、约 93 MiB 运行时与双份会话等成本，因此不采用。
+
+据此，`src/prompt.ts` 按区块读取 `getCurrentSystemMessage`：开头整句替换；`<docs>` 仅在与 Pi 1.5.2 模板完全一致时改为原创文案并保留三个文档路径，主题索引改为“列出 Guides 目录找对应文件”；`tools`／`rules`／`project_context`／`skills` 只替换与 Pi 内置原文整行完全相同的行；其他区块、扩展与用户内容逐字保留，不认识的文本一律不改。`test/prompt.test.ts` 在测试中从开发依赖的 Pi 生成真实默认提示词，断言所有内置文案均被替换、路径与用户内容保留；Pi 升级改动措辞时该测试会失败，须同步更新常量后再发布。已知残留：第三方技能自带的描述（如 pi-subagent）仍含 “Pi”，按范围不改。
+
+适配后经授权 6 次真实验证：截图失败轮的完整上下文（13 个工具、21 条内容）Argon High 200（输出上限内被思考用尽，仅证明接收）；Flash Low 新会话 200 并回复 OK；以 `--no-extensions -e ./src/index.ts`、项目级关闭重试，在真实 Pi 中完成 Argon High 原生 `read` 闭环（2 次后端请求，工具实际执行，结果正确）。Claude Sonnet 两次均 400：后端拒绝含 `anyOf` 等结构的扩展工具 schema（报 `tools.N.custom.input_schema` 非 draft 2020-12），与提示词无关的既有问题，提示词在 Claude 路由上尚未验证，需另行处理。
 
 ### 6.3 工具与 Pi 公开转换器
 

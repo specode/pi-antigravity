@@ -10,10 +10,10 @@ import {
 	createRequestIdentity,
 	createSessionIdentity,
 	fnvSessionId,
-	rewriteDefaultPrompt,
 	uppercaseSchemaTypes,
 	type RequestRoute,
 } from "../src/request.ts";
+import { adaptSystemPrompt, rewriteDefaultPrompt } from "../src/prompt.ts";
 
 const OPENING = "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.";
 const REPLACEMENT = "You are a coding agent helping the user with their project.";
@@ -87,7 +87,7 @@ test("rewrites only the exact default opening and preserves the complete suffix"
 test("project instructions reference the known opener without reinjecting its literal text", () => {
 	const instructions = readFileSync(new URL("../AGENTS.md", import.meta.url), "utf8");
 	assert.equal(instructions.includes(OPENING), false, "The exact opener must stay in source, not in injected project documentation");
-	assert.ok(instructions.includes("`src/request.ts`"));
+	assert.ok(instructions.includes("`src/prompt.ts`"));
 	assert.ok(instructions.includes("`PI_OPENING`"));
 });
 
@@ -120,6 +120,7 @@ test("reads prompt sections and current tools from transcript deltas, ignoring l
 	const context = Object.assign(normalizeContext({ messages }), { systemPrompt: "Wrong legacy prompt", tools: [tool] });
 	const before = structuredClone(context);
 	const result = buildRequest(model, context, undefined, route, identity);
+	assert.equal(result.request.systemInstruction.parts[0]!.text, adaptSystemPrompt(messages));
 	assert.equal(result.request.systemInstruction.parts[0]!.text, rewriteDefaultPrompt(getCurrentSystemPrompt(messages)));
 	assert.ok(result.request.systemInstruction.parts[0]!.text.includes("New pi rules"));
 	assert.ok(!result.request.systemInstruction.parts[0]!.text.includes("Old rules"));

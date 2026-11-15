@@ -53,7 +53,7 @@ pi install /path/to/pi-antigravity
 
 - **仅提供对话与工具调用**：本扩展只注册 `antigravity` 聊天提供商，不包含图片生成、内置网页搜索/抓取工具、多账号轮换或额度状态栏。
 - **Token 用量与费用显示**：每轮对话都会记录输入、缓存命中、输出和思考 token 数量。由于走的是订阅额度而非按量计费 API，费用字段固定记为 `0`。
-- **默认系统提示词兼容**：Google 服务端会对 Pi 默认的两句系统提示词开头返回 `429 RESOURCE_EXHAUSTED`。扩展在发送请求时仅把这两句默认开头替换为 `You are a coding agent helping the user with their project.`，不会改动你的 `AGENTS.md`、自定义系统提示词、用户消息或会话文件。
+- **默认系统提示词兼容**：Google 服务端会对 Pi 内置系统提示词中的部分文案返回 `429 RESOURCE_EXHAUSTED`（已确认默认开头和内置文档指引中的一行）。扩展在发送请求时，会把 Pi 内置的提示词文案（开头、内置工具简介与规则、文档指引、项目规则和技能列表标题）改写为不提及 Pi 的等义文案。只改写与 Pi 1.5.2 原文完全一致的部分；文件路径、环境变量名、工具名与 schema、技能条目、其他扩展的区块、你的 `AGENTS.md`、自定义系统提示词、用户消息和会话文件都原样保留。Google 可能将此视为规避其对第三方客户端的识别，账号风险需自行承担。
 - **需要已有 Cloud Code 项目**：登录的 Google 账号需要已有可用的 Antigravity / Cloud Code Assist 项目，不支持自动创建 GCP 项目或企业版接口路由。
 
 ### 配套扩展

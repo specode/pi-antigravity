@@ -1,10 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Api, Model, SimpleStreamOptions, TranscriptContext } from "@earendil-works/pi-ai";
-import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai";
+import { getCurrentTools } from "@earendil-works/pi-ai";
 import { convertMessages, convertTools, mapToolChoice } from "./google-shared.ts";
+import { adaptSystemPrompt } from "./prompt.ts";
 
-const PI_OPENING = "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.";
-const CLI_OPENING = "You are a coding agent helping the user with their project.";
 const THINKING_LEVELS = new Set(["MINIMAL", "LOW", "MEDIUM", "HIGH"]);
 
 /** Accept explicit off at this boundary; Pi's simple options normally represent it as undefined. */
@@ -69,14 +68,6 @@ export interface CliRequest {
 		sessionId: string;
 		toolConfig?: { functionCallingConfig: { mode: ReturnType<typeof mapToolChoice> } };
 	};
-}
-
-/** Rewrite only the exact known leading sentences, never text elsewhere in the prompt. */
-export function rewriteDefaultPrompt(prompt: string): string {
-	if (!prompt.startsWith(PI_OPENING)) return prompt;
-	const suffix = prompt.slice(PI_OPENING.length);
-	if (suffix !== "" && !/^\s/.test(suffix)) return prompt;
-	return CLI_OPENING + suffix;
 }
 
 /** Official hashToSessionID: UTF-8 bytes, unsigned FNV-1a arithmetic, signed decimal output. */
@@ -263,7 +254,7 @@ export function buildRequest(
 		userAgent: "antigravity",
 		request: {
 			contents,
-			systemInstruction: { role: "user", parts: [{ text: rewriteDefaultPrompt(getCurrentSystemPrompt(context.messages)) }] },
+			systemInstruction: { role: "user", parts: [{ text: adaptSystemPrompt(context.messages) }] },
 			tools,
 			labels: {
 				cascade_id: identity.cascadeId,
