@@ -1,6 +1,6 @@
 {
   "name": "@specode/pi-antigravity",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "description": "Independent Antigravity subscription chat provider for Pi, aligned with the official agy CLI HTTP protocol.",
   "license": "MIT",
