@@ -172,9 +172,15 @@ export function streamAntigravity(
         }
         usage[key] = count;
       }
-      const cached = usage.cachedContentTokenCount ?? 0;
-      const prompt = usage.promptTokenCount ?? cached;
-      if (cached > prompt) throw new AntigravityStreamError("Antigravity cached tokens exceed prompt tokens");
+      const rawCached = usage.cachedContentTokenCount ?? 0;
+      const prompt = usage.promptTokenCount ?? rawCached;
+      const cached = Math.min(rawCached, prompt);
+      if (rawCached > prompt) {
+        const details = { promptTokenCount: prompt, cachedContentTokenCount: rawCached };
+        const existing = output.diagnostics?.find((d) => d.type === "antigravity.usage_clamped");
+        if (existing) existing.details = details;
+        else (output.diagnostics ??= []).push({ type: "antigravity.usage_clamped", timestamp: Date.now(), details });
+      }
       output.usage.input = prompt - cached;
       output.usage.cacheRead = cached;
       output.usage.output = (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0);

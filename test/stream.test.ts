@@ -139,6 +139,29 @@ test("usage is cumulative, separates cached input, includes thinking in output, 
   assert.equal(noThoughts.usage.totalTokens, 5);
 });
 
+test("clamps cached tokens when they exceed prompt tokens instead of aborting the stream", async () => {
+  const clamped = (await run(
+    frame(event([{ text: "OK" }], "STOP", { usageMetadata: { promptTokenCount: 100, cachedContentTokenCount: 120, candidatesTokenCount: 5 } })),
+  )).result;
+  assert.equal(clamped.stopReason, "stop");
+  assert.equal(clamped.usage.input, 0);
+  assert.equal(clamped.usage.cacheRead, 100);
+  assert.equal(clamped.usage.output, 5);
+  assert.deepEqual(clamped.diagnostics?.find((d) => d.type === "antigravity.usage_clamped")?.details, {
+    promptTokenCount: 100,
+    cachedContentTokenCount: 120,
+  });
+
+  const recovered = (await run(
+    frame(event([{ text: "OK" }], undefined, { usageMetadata: { promptTokenCount: 100, cachedContentTokenCount: 120 } })) +
+    frame(event([], "STOP", { usageMetadata: { promptTokenCount: 150, candidatesTokenCount: 8 } })),
+  )).result;
+  assert.equal(recovered.stopReason, "stop");
+  assert.equal(recovered.usage.input, 30);
+  assert.equal(recovered.usage.cacheRead, 120);
+  assert.equal(recovered.usage.output, 8);
+});
+
 test("honors async payload replacement and hooks before body consumption and normalization", async () => {
   const order: string[] = [];
   let optionsSeen: AntigravityStreamOptions | undefined;
