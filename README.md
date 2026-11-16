@@ -43,7 +43,7 @@ The model list is fetched from Google's Cloud Code API for your account and cach
 | Model ID | Name | Thinking levels | Context | Max output | Images |
 | --- | --- | --- | --- | --- | --- |
 | `gemini-4-argon` | Gemini 4 Argon | `low`, `medium`, `high` | 1M | 65.5K | Yes |
-| `gemini-4-hydrogen` | Gemini 4 Hydrogen | `low`, `medium`, `high` | 1M | 262.1K | Yes |
+| `gemini-4-hydrogen` | Gemini 4 Hydrogen | `low`, `medium`, `high`, `xhigh` | 1M | 262.1K | Yes |
 | `gemini-3.8-flash` | Gemini 3.8 Flash | `low`, `medium`, `high` | 1M | 65.5K | Yes |
 | `claude-opus-5-5` | Claude Opus 5.5 | `low`, `medium`, `high` | 1M | 128K | Yes |
 | `claude-sonnet-5-5` | Claude Sonnet 5.5 | `low`, `medium`, `high` | 1M | 128K | Yes |

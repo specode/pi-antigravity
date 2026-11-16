@@ -53,6 +53,22 @@ test("discovery groups only explicit runtimes and retains model enum, exact effo
   assert.deepEqual(getSupportedThinkingLevels(flash), ["low", "high"]);
   assert.equal(catalog.routes[flash.id].default.runtimeId, "gemini-synthetic-flash-low");
   assert.deepEqual(catalog.routes[flash.id].levels.high, { runtimeId: "gemini-synthetic-flash-high", modelEnum: "MODEL_SYNTHETIC_HIGH", thinkingLevel: "HIGH" });
+  const xhighCatalog = buildAntigravityCatalog({
+    models: {
+      "gemini-synthetic-hydrogen-low": info({ displayName: "Synthetic Hydrogen (Low)", model: "MODEL_SYNTHETIC_H_LOW", thinkingLevel: 1 }),
+      "gemini-synthetic-hydrogen-xhigh": info({ displayName: "Synthetic Hydrogen (XHigh)", model: "MODEL_SYNTHETIC_H_XHIGH", thinkingLevel: 100 }),
+    },
+    agentModelSorts: [{ groups: [{ modelIds: ["gemini-synthetic-hydrogen-low", "gemini-synthetic-hydrogen-xhigh"] }] }],
+  });
+  const hydrogen = xhighCatalog.models[0];
+  assert.equal(hydrogen.id, "gemini-synthetic-hydrogen");
+  assert.equal(hydrogen.name, "Synthetic Hydrogen");
+  assert.deepEqual(getSupportedThinkingLevels(hydrogen), ["low", "xhigh"]);
+  assert.deepEqual(xhighCatalog.routes[hydrogen.id].levels.xhigh, {
+    runtimeId: "gemini-synthetic-hydrogen-xhigh",
+    modelEnum: "MODEL_SYNTHETIC_H_XHIGH",
+    thinkingLevel: "XHIGH",
+  });
   assert.equal(flash.api, "antigravity"); assert.equal(flash.baseUrl, DEFAULT_BASE_URL);
   assert.deepEqual(flash.cost, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
   assert.equal(catalog.routes["chat-synthetic"].default.thinkingLevel, undefined);

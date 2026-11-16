@@ -7,7 +7,7 @@ import { assertOfficialBaseUrl, DEFAULT_BASE_URL, postJson } from "./client.ts";
 export interface CatalogRoute {
   runtimeId: string;
   modelEnum: string;
-  thinkingLevel?: "LOW" | "MEDIUM" | "HIGH";
+  thinkingLevel?: "LOW" | "MEDIUM" | "HIGH" | "XHIGH";
 }
 export interface CatalogModelRoutes {
   default: CatalogRoute;
@@ -56,7 +56,7 @@ export interface AntigravityCatalogController {
   assertOwnership(ownership: CatalogOwnership): void;
 }
 const LEVELS: ModelThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
-const EFFORTS = { low: "LOW", medium: "MEDIUM", high: "HIGH" } as const;
+const EFFORTS = { low: "LOW", medium: "MEDIUM", high: "HIGH", xhigh: "XHIGH" } as const;
 const REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
@@ -81,7 +81,7 @@ function invalidCatalog(): Error { return new Error("Antigravity returned an emp
  * directory replies; static declarations do not prove every account's payload.
  * No fuzzy family merges,
  * placeholder IDs, guessed limits/prices, or synthetic thinking-budget levels.
- * Only explicit low/medium/high suffixes are grouped; unknown efforts are not advertised.
+ * Only explicit low/medium/high/xhigh suffixes are grouped; unknown efforts are not advertised.
  */
 export function buildAntigravityCatalog(payload: unknown, baseUrl = DEFAULT_BASE_URL, api: Api = "antigravity"): AntigravityCatalog {
   baseUrl = assertOfficialBaseUrl(baseUrl);
@@ -115,7 +115,7 @@ export function buildAntigravityCatalog(payload: unknown, baseUrl = DEFAULT_BASE
       (info.supportsThinking !== undefined && typeof info.supportsThinking !== "boolean") ||
       (info.supportsImages !== undefined && typeof info.supportsImages !== "boolean") ||
       typeof info.model !== "string" || !/^MODEL_[A-Z0-9_]+$/.test(info.model)) throw invalidCatalog();
-    const suffix = /^(.*)-(low|medium|high)$/.exec(id);
+    const suffix = /^(.*)-(low|medium|high|xhigh)$/.exec(id);
     // The CLI protobuf declares thinking_level as int32, not an enum. Its
     // numeric semantics are not established by these captures. Preserve it,
     // but do not reinterpret it as generationConfig.thinkingLevel.
@@ -126,7 +126,7 @@ export function buildAntigravityCatalog(payload: unknown, baseUrl = DEFAULT_BASE
     if (!supportsThinking && suffix) throw invalidCatalog();
     const level: ModelThinkingLevel = suffix ? suffix[2] as keyof typeof EFFORTS : "off";
     const publicId = suffix ? suffix[1] : id;
-    const name = cleanName(info.displayName ?? info.label ?? info.modelName, publicId).replace(/\s*\((?:low|medium|high)\)\s*$/i, "");
+    const name = cleanName(info.displayName ?? info.label ?? info.modelName, publicId).replace(/\s*\((?:low|medium|high|xhigh)\)\s*$/i, "");
     const normalized: CatalogSource["models"][string] = {
       displayName: name, model: info.model, maxTokens: info.maxTokens, maxOutputTokens: info.maxOutputTokens,
       supportsThinking, ...(typeof info.thinkingLevel === "number" ? { thinkingLevel: info.thinkingLevel } : {}),
@@ -150,7 +150,7 @@ export function buildAntigravityCatalog(payload: unknown, baseUrl = DEFAULT_BASE
       if (levels[entry.level]) throw invalidCatalog();
       levels[entry.level] = entry.route;
     }
-    const defaultRoute = levels.off ?? levels.low ?? levels.medium ?? levels.high;
+    const defaultRoute = levels.off ?? levels.low ?? levels.medium ?? levels.high ?? levels.xhigh;
     if (!defaultRoute) throw invalidCatalog();
     routes[id] = { default: defaultRoute, levels };
     models.push({ type: "chat", id, name: group.name, provider: "antigravity", api, baseUrl, reasoning,

@@ -411,6 +411,11 @@ test("thinking tiers and sampling are explicit, with no model or thinking downgr
 	const result = buildRequest(model, context, { reasoning: "high", maxTokens: 123, temperature: 0 }, high, identity);
 	assert.equal(result.model, "gemini-4-argon-high");
 	assert.deepEqual(result.request.generationConfig, { maxOutputTokens: 123, temperature: 0, thinkingConfig: { includeThoughts: true, thinkingLevel: "HIGH" } });
+	const xhighModel = { ...model, thinkingLevelMap: { low: "low", medium: "medium", high: "high", xhigh: "xhigh" } };
+	const xhighRoute: RequestRoute = { runtimeId: "gemini-4-hydrogen-xhigh", modelEnum: "MODEL_SYNTHETIC_HYDROGEN", thinkingLevel: "XHIGH" };
+	const xhighResult = buildRequest(xhighModel, context, { reasoning: "xhigh", maxTokens: 256 }, xhighRoute, identity);
+	assert.equal(xhighResult.model, "gemini-4-hydrogen-xhigh");
+	assert.deepEqual(xhighResult.request.generationConfig, { maxOutputTokens: 256, thinkingConfig: { includeThoughts: true, thinkingLevel: "XHIGH" } });
 	for (const reasoning of ["off", "high", "max", "xhigh"] as const) assert.throws(() => buildRequest(model, context, { reasoning }, route, identity), /does not match/);
 	assert.throws(() => buildRequest(model, context, { thinkingBudgets: { low: 123 } }, route, identity), /not token budgets/);
 	assert.throws(() => buildRequest(model, context, undefined, { ...route, thinkingLevel: "MAX" } as unknown as RequestRoute, identity), /Unsupported/);

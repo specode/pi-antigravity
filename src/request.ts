@@ -4,7 +4,7 @@ import { getCurrentTools } from "@earendil-works/pi-ai";
 import { convertMessages, convertTools, mapToolChoice } from "./google-shared.ts";
 import { adaptSystemPrompt } from "./prompt.ts";
 
-const THINKING_LEVELS = new Set(["MINIMAL", "LOW", "MEDIUM", "HIGH"]);
+const THINKING_LEVELS = new Set(["MINIMAL", "LOW", "MEDIUM", "HIGH", "XHIGH"]);
 
 /** Accept explicit off at this boundary; Pi's simple options normally represent it as undefined. */
 export type RequestOptions = Omit<SimpleStreamOptions, "reasoning"> & {
@@ -15,7 +15,7 @@ export type RequestOptions = Omit<SimpleStreamOptions, "reasoning"> & {
 export interface RequestRoute {
 	runtimeId: string;
 	modelEnum: string;
-	thinkingLevel?: "MINIMAL" | "LOW" | "MEDIUM" | "HIGH";
+	thinkingLevel?: "MINIMAL" | "LOW" | "MEDIUM" | "HIGH" | "XHIGH";
 }
 
 export interface SessionIdentity {

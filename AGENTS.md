@@ -85,7 +85,7 @@ antigravity/cli/1.5.9 (aidev_client; os_type=darwin; arch=arm64; cl=1021519450; 
 ## 5. 模型发现与路由
 
 - 使用 `fetchAvailableModels`，保留公开选择 id 与实际请求 runtime id 的分离。例如 `gemini-3.8-flash` 对应本次验证的 `gemini-3.8-flash-low`。
-- 从目录读取实际模型 id、档位、`model` enum、输入能力和 token 上限。`model_enum` 不是发往请求顶层 `model` 的 id。开发阶段静态确认目录 `thinkingLevel` 为 int32，仅保留数值，不猜测其枚举语义；当前路由只归并明确的 `-low/-medium/-high` runtime 后缀。无后缀但声明思考能力的未知协议不公开，未声明的 proto3 boolean 按 false 处理。
+- 从目录读取实际模型 id、档位、`model` enum、输入能力和 token 上限。`model_enum` 不是发往请求顶层 `model` 的 id。开发阶段静态确认目录 `thinkingLevel` 为 int32，仅保留数值，不猜测其枚举语义；当前路由只归并明确的 `-low/-medium/-high/-xhigh` runtime 后缀（官方 CLI 1.5.9 `GenerationConfig.ThinkingConfig.ThinkingLevel` protobuf 描述符含公开枚举 `XHIGH = 7`，目录中的 `gemini-4-hydrogen-xhigh` 发送 `thinkingLevel: "XHIGH"` 已实测 200）。无后缀但声明思考能力的未知协议不公开，未声明的 proto3 boolean 按 false 处理。
 - 后端目录存在 `agentModelSorts`、`imageGenerationModelIds` 等信息；不要把内部 `MODEL_PLACEHOLDER_*`、image 模型或内部占位模型全部暴露成聊天模型。
 - 通过当前 Pi 的 `refreshModels`／publish 和模型存储契约工作。离线启动应可恢复最后成功目录；刷新失败不能清空可用列表。账号更换后的缓存隔离与取消需要测试。
 - 不能在失败后悄悄更换模型代际、思考档位或账号。不得把 API 成功、速度或费用当成所选模型实际被服务的证明；响应 `modelVersion` 可能不同，例如本次 Argon 返回 `gemini-4-argon-trial`。
@@ -99,7 +99,7 @@ antigravity/cli/1.5.9 (aidev_client; os_type=darwin; arch=arm64; cl=1021519450; 
 
 内层包含 `contents`、`systemInstruction`、`tools`、`labels`、`generationConfig`、`sessionId`。官方不是 ACP 的仅三个字段包装；不要为了“轻量”去掉已观察到的 CLI 协议字段。
 
-本次 Flash/Sonnet Low 使用 `thinkingConfig: {includeThoughts: true, thinkingLevel: LOW}`；后续 Argon High、Opus High 在验证脚本中使用 `HIGH` 也成功。不要照搬旧上游对所有模型发 `thinkingBudget` 的做法，但也不把已测档位推广成所有模型支持 `off/xhigh/max`。
+本次 Flash/Sonnet Low 使用 `thinkingConfig: {includeThoughts: true, thinkingLevel: LOW}`；后续 Argon High、Opus High 在验证脚本中使用 `HIGH` 也成功，Hydrogen XHigh（`gemini-4-hydrogen-xhigh`）使用 `XHIGH` 实测 200。不要照搬旧上游对所有模型发 `thinkingBudget` 的做法，但也不把已测档位推广成所有模型支持 `off/xhigh/max`（仅在目录显式存在对应后缀路由时开放）。
 
 ### 6.2 Pi 提示词与 429 对照
 

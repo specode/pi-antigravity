@@ -43,7 +43,7 @@ pi install /path/to/pi-antigravity
 | 模型 ID | 名称 | 推理档位 | 上下文 | 最大输出 | 图片输入 |
 | --- | --- | --- | --- | --- | --- |
 | `gemini-4-argon` | Gemini 4 Argon | `low`、`medium`、`high` | 1M | 65.5K | 支持 |
-| `gemini-4-hydrogen` | Gemini 4 Hydrogen | `low`、`medium`、`high` | 1M | 262.1K | 支持 |
+| `gemini-4-hydrogen` | Gemini 4 Hydrogen | `low`、`medium`、`high`、`xhigh` | 1M | 262.1K | 支持 |
 | `gemini-3.8-flash` | Gemini 3.8 Flash | `low`、`medium`、`high` | 1M | 65.5K | 支持 |
 | `claude-opus-5-5` | Claude Opus 5.5 | `low`、`medium`、`high` | 1M | 128K | 支持 |
 | `claude-sonnet-5-5` | Claude Sonnet 5.5 | `low`、`medium`、`high` | 1M | 128K | 支持 |
