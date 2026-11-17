@@ -59,8 +59,22 @@ for (const publicId of ["gemini-3.8-flash", "claude-sonnet-5-5"]) {
         assert.ok(url.endsWith(":streamGenerateContent?alt=sse"));
         const payload = JSON.parse(String(init?.body));
         requests.push(payload);
-        if (requests.length === 1) return sse([{ functionCall: { id: "call_read_1", name: "read", args: { path: "probe.txt" } }, thoughtSignature: "c2lnbmF0dXJl" }]);
+        if (requests.length === 1) {
+          const events = [
+            { response: { usageMetadata: { promptTokenCount: 20, cachedContentTokenCount: 25 } } },
+            ...(publicId.startsWith("claude-") ? [
+              { response: { candidates: [{ content: { parts: [{ text: "Read ", thought: true }, { text: "the file", thought: true }] } }] } },
+              { response: { candidates: [{ content: { parts: [{ thought: true, thoughtSignature: "dGhpbms=" }] } }] } },
+            ] : []),
+            { response: { candidates: [{ content: { parts: [{ functionCall: { id: "call_read_1", name: "read", args: { path: "probe.txt" } }, thoughtSignature: "c2lnbmF0dXJl" }] }, finishReason: "STOP" }],
+              usageMetadata: { cachedContentTokenCount: 15, candidatesTokenCount: 3, totalTokenCount: 23 } } },
+          ];
+          return new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(""), { headers: { "Content-Type": "text/event-stream" } });
+        }
         const parts = payload.request.contents.flatMap((content: any) => content.parts);
+        if (publicId.startsWith("claude-")) assert.deepEqual(parts.filter((part: any) => part.thought), [
+          { thought: true, text: "Read the file", thoughtSignature: "dGhpbms=" },
+        ]);
         assert.ok(parts.some((part: any) => part.functionResponse?.id === "call_read_1"));
         assert.ok(parts.some((part: any) => part.functionCall?.id === "call_read_1" && part.thoughtSignature === "c2lnbmF0dXJl"));
         assert.match(JSON.stringify(parts.find((part: any) => part.functionResponse)?.functionResponse), /AGY_NATIVE_READ_OK/);
@@ -74,11 +88,15 @@ for (const publicId of ["gemini-3.8-flash", "claude-sonnet-5-5"]) {
       const original = structuredClone(context.messages);
       const first = await models.completeSimple(model, context, { reasoning: "low", sessionId: "synthetic-session" });
       assert.equal(first.stopReason, "toolUse", first.errorMessage ?? "Expected a tool call");
+      assert.equal(first.usage.input, 5);
+      assert.equal(first.usage.cacheRead, 15);
+      assert.equal(first.diagnostics?.[0]?.type, "antigravity.usage_anomaly");
       const call = first.content.find(block => block.type === "toolCall");
       assert.ok(call && call.type === "toolCall");
       const result = await read.execute(call.id, { path: String(call.arguments.path) });
       assert.deepEqual(context.messages, original);
-      context.messages.push(first, { role: "toolResult", toolCallId: call.id, toolName: call.name, content: result.content, isError: false, timestamp: 2 });
+      // JSON round trip exercises the same replay shape as a saved/resumed session.
+      context.messages.push(JSON.parse(JSON.stringify(first)), { role: "toolResult", toolCallId: call.id, toolName: call.name, content: result.content, isError: false, timestamp: 2 });
       const second = await models.completeSimple(model, context, { reasoning: "low", sessionId: "synthetic-session" });
       assert.equal(second.stopReason, "stop", second.errorMessage ?? "Expected a completed tool round trip");
       assert.ok(second.content.some(block => block.type === "text" && block.text === "AGY_PI_TOOL_OK"));

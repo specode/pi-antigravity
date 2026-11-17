@@ -28,8 +28,8 @@ function response(text: string, split = false) {
 function dependencies(fetch: typeof globalThis.fetch): AntigravityStreamDependencies {
   return { fetch, buildPayload: () => ({ synthetic: true }), resolveCredentials: () => ({ token: "synthetic-token" }) };
 }
-async function run(text: string, options: AntigravityStreamOptions = {}, split = false) {
-  const s = streamAntigravity(model, context, options, dependencies(async () => response(text, split)));
+async function run(text: string, options: AntigravityStreamOptions = {}, split = false, selected = model) {
+  const s = streamAntigravity(selected, context, options, dependencies(async () => response(text, split)));
   const events: AssistantMessageEvent[] = [];
   for await (const e of s) events.push(e);
   const result = await s.result();
@@ -139,6 +139,174 @@ test("usage is cumulative, separates cached input, includes thinking in output, 
   assert.equal(noThoughts.usage.totalTokens, 5);
 });
 
+test("cache counters above the prompt do not discard valid content or inflate input usage", async () => {
+  const counters = { promptTokenCount: 100, cachedContentTokenCount: 101, candidatesTokenCount: 2, totalTokenCount: 102 };
+  const { result } = await run(frame(event([{ text: "OK" }], "STOP", { usageMetadata: counters })));
+  assert.equal(result.stopReason, "stop");
+  assert.deepEqual(result.content, [{ type: "text", text: "OK" }]);
+  assert.equal(result.usage.input, 0);
+  assert.equal(result.usage.cacheRead, 100);
+  assert.equal(result.usage.totalTokens, 102);
+  const diagnostic = result.diagnostics?.find((d) => d.type === "antigravity.usage_anomaly");
+  assert.deepEqual(diagnostic?.details, { reason: "cached_tokens_exceed_prompt", occurrences: 1, counters });
+});
+
+test("partial usage updates recover after a transient mismatch and retain only bounded numeric evidence", async () => {
+  const initial = { promptTokenCount: 0, cachedContentTokenCount: 80, ignoredPrivateField: "not persisted" };
+  const { result } = await run(frame(event([], undefined, { usageMetadata: initial })) +
+    frame(event([], undefined, { usageMetadata: { cachedContentTokenCount: 90 } })) +
+    frame(event([{ text: "OK" }], "STOP", { usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 5 } })) +
+    frame({ response: { usageMetadata: { candidatesTokenCount: 7, totalTokenCount: 107 } } }));
+  assert.equal(result.stopReason, "stop");
+  assert.equal(result.usage.input, 10);
+  assert.equal(result.usage.cacheRead, 90);
+  assert.equal(result.usage.output, 7);
+  assert.equal(result.usage.totalTokens, 107);
+  assert.equal(result.diagnostics?.length, 1);
+  assert.deepEqual(result.diagnostics[0]!.details, {
+    reason: "cached_tokens_exceed_prompt", occurrences: 2,
+    counters: { promptTokenCount: 0, cachedContentTokenCount: 90 },
+  });
+});
+
+test("trailing usage anomalies keep tool calls and still require a complete valid stream", async () => {
+  const counters = { promptTokenCount: 30, cachedContentTokenCount: 40 };
+  const tool = { functionCall: { id: "read-one", name: "read", args: { path: "synthetic.txt" } } };
+  const text = frame(event([tool], "STOP")) + frame({ response: { usageMetadata: counters } });
+  const { result } = await run(text);
+  assert.equal(result.stopReason, "toolUse");
+  assert.equal(result.content[0]!.type, "toolCall");
+  assert.equal(result.usage.input + result.usage.cacheRead, 30);
+  assert.equal(result.usage.totalTokens, 30);
+  const broken = (await run(text + "data: {broken")).result;
+  assert.equal(broken.stopReason, "error");
+  assert.match(broken.errorMessage!, /incomplete frame/);
+  const unfinished = (await run(frame(event([tool], undefined, { usageMetadata: counters })))).result;
+  assert.match(unfinished.errorMessage!, /without a finish reason/);
+});
+
+test("missing prompt counts and explicit zero cache counts retain their existing semantics", async () => {
+  const first = frame(event([], undefined, { usageMetadata: { cachedContentTokenCount: 40 } }));
+  const cachedOnly = (await run(first + frame(event([], "STOP")))).result;
+  assert.equal(cachedOnly.usage.input, 0);
+  assert.equal(cachedOnly.usage.cacheRead, 40);
+  assert.equal(cachedOnly.diagnostics, undefined);
+  const reset = (await run(first + frame(event([], "STOP", {
+    usageMetadata: { promptTokenCount: 100, cachedContentTokenCount: 0 },
+  })))).result;
+  assert.equal(reset.usage.input, 100);
+  assert.equal(reset.usage.cacheRead, 0);
+});
+
+test("invalid usage counters are diagnosed without coercing values or discarding valid answers", async () => {
+  for (const count of [-1, 1.5, "private-provider-text", null, Number.MAX_SAFE_INTEGER + 1]) {
+    const { result } = await run(frame(event([], undefined, { usageMetadata: { cachedContentTokenCount: 40 } })) +
+      frame(event([{ text: "OK" }], "STOP", { usageMetadata: { promptTokenCount: 100, cachedContentTokenCount: count } })));
+    assert.equal(result.stopReason, "stop");
+    assert.equal(result.usage.input, 60);
+    assert.equal(result.usage.cacheRead, 40);
+    assert.deepEqual(result.diagnostics?.[0]?.details, {
+      reason: "invalid_usage_counter", occurrences: 1,
+      counters: { promptTokenCount: 100, cachedContentTokenCount: 40 },
+      invalidFields: ["cachedContentTokenCount"],
+    });
+    assert.equal(JSON.stringify(result).includes("private-provider-text"), false);
+  }
+});
+
+test("malformed or unknown usage metadata does not affect completion integrity", async () => {
+  for (const usageMetadata of [null, [], "private-provider-text", false, 42]) {
+    const { result } = await run(frame(event([{ text: "OK" }], "STOP", { usageMetadata })));
+    assert.equal(result.stopReason, "stop");
+    assert.deepEqual(result.content, [{ type: "text", text: "OK" }]);
+    assert.deepEqual(result.diagnostics?.[0]?.details, {
+      reason: "invalid_usage_metadata", occurrences: 1, counters: {},
+    });
+    assert.equal(JSON.stringify(result).includes("private-provider-text"), false);
+  }
+  const unknown = (await run(frame(event([], "STOP", { usageMetadata: { futureField: "ignored" } })))).result;
+  assert.equal(unknown.stopReason, "stop");
+  assert.equal(unknown.diagnostics, undefined);
+});
+
+for (const id of ["claude-opus-5-5", "claude-sonnet-5-5"]) {
+  test(`${id} attaches an empty signature tail to its preceding unsigned thinking block`, async () => {
+    const selected = { ...model, id };
+    for (const sameFrame of [false, true]) {
+      const start = { text: "Reason", thought: true };
+      const tail = { text: "", thought: true, thoughtSignature: "dGhpbms=" };
+      const text = (sameFrame ? frame(event([start, tail])) : frame(event([start])) + frame(event([tail]))) +
+        frame(event([{ functionCall: { id: "call", name: "read", args: {} } }], "STOP"));
+      const { result, events } = await run(text, {}, true, selected);
+      assert.equal(result.stopReason, "toolUse");
+      assert.deepEqual(result.content[0], { type: "thinking", thinking: "Reason", thinkingSignature: "dGhpbms=" });
+      assert.equal(result.content.length, 2);
+      assert.equal(events.filter((e) => e.type === "thinking_start").length, 1);
+      assert.equal(events.filter((e) => e.type === "thinking_end").length, 1);
+    }
+  });
+}
+
+test("Claude thinking accepts signatures on text deltas or text-less tails across frame and part layouts", async () => {
+  const selected = { ...model, id: "claude-future-model" };
+  for (const tail of [
+    { text: "last", thought: true, thoughtSignature: "dGhpbms=" },
+    { thought: true, thoughtSignature: "dGhpbms=" },
+  ]) {
+    for (const sameFrame of [true, false]) {
+      const parts = [{ text: "", thought: true }, { text: "first ", thought: true }, { text: "middle ", thought: true }, tail];
+      const text = sameFrame ? frame(event(parts, "STOP"))
+        : parts.map((part, i) => frame(event([part], i === parts.length - 1 ? "STOP" : undefined))).join("");
+      const { result, events } = await run(text, {}, true, selected);
+      assert.equal(result.stopReason, "stop");
+      assert.deepEqual(result.content, [{
+        type: "thinking", thinking: "first middle " + (tail.text ?? ""), thinkingSignature: "dGhpbms=",
+      }]);
+      assert.equal(events.filter((e) => e.type === "thinking_start").length, 1);
+      assert.equal(events.filter((e) => e.type === "thinking_end").length, 1);
+    }
+  }
+});
+
+test("Claude signature tails never cross text/tool boundaries or replace an existing signature", async () => {
+  const selected = { ...model, id: "claude-opus-5-5" };
+  const tail = { text: "", thought: true, thoughtSignature: "dGFpbA==" };
+  for (const preceding of [
+    { text: "signed", thought: true, thoughtSignature: "Zmlyc3Q=" },
+    { text: "plain" },
+    { functionCall: { id: "call", name: "read", args: {} } },
+  ]) {
+    const { result } = await run(frame(event([preceding])) + frame(event([tail], "STOP")), {}, false, selected);
+    assert.equal(result.content.length, 2);
+    assert.deepEqual(result.content[1], { type: "thinking", thinking: "", thinkingSignature: "dGFpbA==" });
+    if (preceding.thoughtSignature) assert.equal((result.content[0] as { thinkingSignature?: string }).thinkingSignature, "Zmlyc3Q=");
+  }
+  const orphan = (await run(frame(event([tail], "STOP")), {}, false, selected)).result;
+  assert.deepEqual(orphan.content, [{ type: "thinking", thinking: "", thinkingSignature: "dGFpbA==" }]);
+});
+
+test("a completed Claude thinking signature does not absorb the next unsigned thinking block", async () => {
+  const text = frame(event([{ text: "first", thought: true }])) +
+    frame(event([{ text: "", thought: true, thoughtSignature: "Zmlyc3Q=" }])) +
+    frame(event([{ text: "second", thought: true }])) +
+    frame(event([{ text: "", thought: true, thoughtSignature: "c2Vjb25k" }], "STOP"));
+  const { result } = await run(text, {}, false, { ...model, id: "claude-opus-5-5" });
+  assert.deepEqual(result.content, [
+    { type: "thinking", thinking: "first", thinkingSignature: "Zmlyc3Q=" },
+    { type: "thinking", thinking: "second", thinkingSignature: "c2Vjb25k" },
+  ]);
+});
+
+test("Gemini signature-only thinking parts keep their original boundaries", async () => {
+  const text = frame(event([{ text: "Reason", thought: true }])) +
+    frame(event([{ text: "", thought: true, thoughtSignature: "dGhpbms=" }], "STOP"));
+  const { result } = await run(text, {}, false, { ...model, id: "gemini-4-hydrogen" });
+  assert.deepEqual(result.content, [
+    { type: "thinking", thinking: "Reason" },
+    { type: "thinking", thinking: "", thinkingSignature: "dGhpbms=" },
+  ]);
+});
+
 test("honors async payload replacement and hooks before body consumption and normalization", async () => {
   const order: string[] = [];
   let optionsSeen: AntigravityStreamOptions | undefined;
@@ -192,7 +360,6 @@ for (const [name, text, pattern] of [
   ["invalid args", frame(event([{ functionCall: { name: "bad", args: "{broken" } }], "STOP")), /functionCall.args/],
   ["duplicate ID", frame(event([{ functionCall: { name: "a", id: "same" } }, { functionCall: { name: "b", id: "same" } }], "STOP")), /duplicate.*ID/],
   ["blocked finish", frame(event([{ text: "partial" }], "SAFETY")), /SAFETY/],
-  ["invalid counter", frame(event([], "STOP", { usageMetadata: { thoughtsTokenCount: -1 } })), /usage counter/],
   ["conflicting finish", complete + frame(event([], "MAX_TOKENS")), /Conflicting/],
   ["text after finish", complete + frame(event([{ text: "extra" }])), /after the finish/],
 ] as const) {

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { Api, Model, SimpleStreamOptions, TranscriptContext } from "@earendil-works/pi-ai";
+import type { Api, AssistantMessage, Model, SimpleStreamOptions, TranscriptContext } from "@earendil-works/pi-ai";
 import { getCurrentTools } from "@earendil-works/pi-ai";
 import { convertMessages, convertTools, mapToolChoice } from "./google-shared.ts";
 import { adaptSystemPrompt } from "./prompt.ts";
@@ -198,6 +198,34 @@ function validateThinking(model: Model<Api>, options: RequestOptions | undefined
 }
 
 /**
+ * Reassemble consecutive Claude thinking deltas up to their sealing signature.
+ * This also repairs history split by older versions. Work on request-local
+ * copies: never rewrite saved sessions or combine different model/provider/API
+ * signatures. Text, tool calls and already signed blocks are hard boundaries.
+ */
+function repairClaudeThinkingTails(model: Model<Api>, context: TranscriptContext): TranscriptContext {
+	if (!model.id.startsWith("claude-")) return context;
+	return { ...context, messages: context.messages.map((message) => {
+		if (message.role !== "assistant" || message.provider !== model.provider ||
+			message.model !== model.id || message.api !== model.api ||
+			message.stopReason === "error" || message.stopReason === "aborted") return message;
+		const content: AssistantMessage["content"] = [];
+		for (const block of message.content) {
+			const previous = content.at(-1);
+			if (block.type === "thinking" && previous?.type === "thinking" && !previous.thinkingSignature) {
+				content[content.length - 1] = {
+					...previous, thinking: previous.thinking + block.thinking,
+					...(block.thinkingSignature ? { thinkingSignature: block.thinkingSignature } : {}),
+				};
+			} else {
+				content.push(block);
+			}
+		}
+		return { ...message, content };
+	}) };
+}
+
+/**
  * Pure serialization. Transport owns onPayload (including replacement), response/stream
  * hooks, authentication headers, endpoint validation, cancellation and HTTP execution.
  * No fallback model, thinking clamp, endpoint retry, or hidden execution ID is created.
@@ -222,7 +250,9 @@ export function buildRequest(
 	// The public converter's generic accepts Google API names, but its implementation
 	// supports this wire format with custom providers. This is a type-only narrowing:
 	// changing model.id or model.api here would invalidate same-model thought signatures.
-	const contents = structuredClone(convertMessages(model as Model<"google-generative-ai">, context));
+	const usedClaude = route.runtimeId.startsWith("claude-");
+	const transcript = usedClaude ? repairClaudeThinkingTails(model, context) : context;
+	const contents = structuredClone(convertMessages(model as Model<"google-generative-ai">, transcript));
 	// Only this exact runtime route has a verified function-response role difference.
 	if (route.runtimeId === "gemini-3.8-flash-low") {
 		for (const content of contents) {
@@ -231,7 +261,6 @@ export function buildRequest(
 	}
 
 	const currentTools = getCurrentTools(context.messages);
-	const usedClaude = route.runtimeId.startsWith("claude-");
 	const convertedTools = convertTools(currentTools, true, false) ?? [];
 	const declarations = convertedTools.flatMap((tool) => tool.functionDeclarations);
 	const tools = declarations.map((declaration, index) => {

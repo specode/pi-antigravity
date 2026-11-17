@@ -164,19 +164,41 @@ export function streamAntigravity(
       if (block.type === "thinking") stream.push({ type: "thinking_end", contentIndex: currentIndex, content: block.thinking, partial: output });
       currentIndex = undefined;
     };
+    const noteUsageAnomaly = (reason: string, invalidFields?: string[]) => {
+      // Keep one bounded, numeric-only snapshot, never arbitrary provider data.
+      const diagnostics = output.diagnostics ??= [];
+      const existing = diagnostics.find((d) => d.type === "antigravity.usage_anomaly");
+      const details = {
+        reason, occurrences: Number(existing?.details?.occurrences ?? 0) + 1,
+        counters: { ...usage }, ...(invalidFields ? { invalidFields } : {}),
+      };
+      if (existing) existing.details = details;
+      else diagnostics.push({ type: "antigravity.usage_anomaly", timestamp: Date.now(), details });
+    };
     const readUsage = (value: unknown) => {
-      for (const [key, count] of Object.entries(object(value, "usageMetadata"))) {
+      // Accounting is advisory, not completion integrity. Malformed metadata
+      // must not discard valid text/tools; framing and content still fail closed.
+      if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        noteUsageAnomaly("invalid_usage_metadata");
+        return;
+      }
+      const invalidFields: string[] = [];
+      for (const [key, count] of Object.entries(value)) {
         if (!["promptTokenCount", "candidatesTokenCount", "cachedContentTokenCount", "thoughtsTokenCount", "totalTokenCount"].includes(key)) continue;
         if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) {
-          throw new AntigravityStreamError(`Invalid Antigravity usage counter: ${key}`);
+          invalidFields.push(key);
+          continue;
         }
         usage[key] = count;
       }
+      if (invalidFields.length) noteUsageAnomaly("invalid_usage_counter", invalidFields);
       const cached = usage.cachedContentTokenCount ?? 0;
       const prompt = usage.promptTokenCount ?? cached;
-      if (cached > prompt) throw new AntigravityStreamError("Antigravity cached tokens exceed prompt tokens");
-      output.usage.input = prompt - cached;
-      output.usage.cacheRead = cached;
+      if (cached > prompt) noteUsageAnomaly("cached_tokens_exceed_prompt");
+      // Prompt is the inclusive input total; cap its cached subset, not the
+      // prompt itself. Later consistent counters replace this provisional view.
+      output.usage.input = Math.max(0, prompt - cached);
+      output.usage.cacheRead = Math.min(cached, prompt);
       output.usage.output = (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0);
       if (usage.thoughtsTokenCount !== undefined) output.usage.reasoning = usage.thoughtsTokenCount;
       output.usage.totalTokens = usage.totalTokenCount ?? prompt + output.usage.output;
@@ -203,14 +225,18 @@ export function streamAntigravity(
         stream.push({ type: "toolcall_start", contentIndex, partial: output });
         stream.push({ type: "toolcall_delta", contentIndex, delta: JSON.stringify(args), partial: output });
         stream.push({ type: "toolcall_end", contentIndex, toolCall, partial: output });
-      } else if (part.text !== undefined) {
-        const text = optionalString(part.text, "part.text")!;
+      } else if (part.text !== undefined || (part.thought === true && signature)) {
+        // A signature-only tail may omit text entirely (proto3 empty default).
+        const text = optionalString(part.text, "part.text") ?? "";
         if (finishReason && text !== "") throw new AntigravityStreamError("Antigravity sent text after the finish reason");
         if (part.thought !== undefined && typeof part.thought !== "boolean") throw new AntigravityStreamError("Invalid Antigravity thought flag");
         const type = part.thought === true ? "thinking" : "text";
-        // Separate explicit parts and every signed part. Unindexed, unsigned deltas in
-        // later frames can extend the current block, but signatures never move to it.
-        if (explicitBoundary || signature) closeBlock();
+        // Claude thinking arrives as consecutive deltas, sealed by a signature
+        // on the last text delta or a separate (possibly text-less) tail. Part
+        // array/frame boundaries are not Claude thinking-block boundaries.
+        // Gemini's signed parts have different replay semantics: preserve them.
+        const claudeThinking = model.id.startsWith("claude-") && type === "thinking";
+        if (!claudeThinking && (explicitBoundary || signature)) closeBlock();
         if (currentIndex === undefined || output.content[currentIndex]!.type !== type) {
           closeBlock();
           currentIndex = output.content.push(type === "text" ? { type, text: "" } : { type, thinking: "" }) - 1;
@@ -225,6 +251,8 @@ export function streamAntigravity(
           block.thinking += text;
           if (signature) block.thinkingSignature = signature;
           stream.push({ type: "thinking_delta", contentIndex: currentIndex, delta: text, partial: output });
+          // Do not append the next thinking block to already signed content.
+          if (claudeThinking && signature) closeBlock();
         }
       } else {
         throw new AntigravityStreamError("Unsupported Antigravity response part", { keys: Object.keys(part) });

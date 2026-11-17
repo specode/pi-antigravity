@@ -289,6 +289,75 @@ test("Claude result role remains user with paired IDs and Claude labels", () => 
 	for (const key of ["used_claude", "used_claude_conservative", "used_non_gemini_model"] as const) assert.equal(result.request.labels[key], "true");
 });
 
+test("resumed Claude history repairs adjacent signature tails without changing stored messages", () => {
+	for (const id of ["claude-opus-5-5", "claude-sonnet-5-5"]) {
+		const claude = { ...model, id };
+		const context = normalizeContext({ tools: [tool], messages: [user(), assistant([
+			{ type: "text", text: "" },
+			{ type: "thinking", thinking: "Original reasoning" },
+			{ type: "thinking", thinking: "", thinkingSignature: "dGhpbms=" },
+			{ type: "toolCall", id: "call_1", name: "read", arguments: { path: "sample.txt" } },
+		], claude), { role: "toolResult", toolCallId: "call_1", toolName: "read", content: [{ type: "text", text: "OK" }], isError: false, timestamp: 3 }] });
+		const before = structuredClone(context);
+		const selected = { ...route, runtimeId: `${id}-low` };
+		const result = buildRequest(claude, deepFreeze(context), undefined, selected, identity);
+		assert.deepEqual(result.request.contents[1]!.parts, [
+			{ thought: true, text: "Original reasoning", thoughtSignature: "dGhpbms=" },
+			{ functionCall: { name: "read", args: { path: "sample.txt" }, id: "call_1" } },
+		]);
+		assert.equal(result.request.contents[2]!.parts![0]!.functionResponse!.id, "call_1");
+		assert.deepEqual(context, before);
+		assert.deepEqual(buildRequest(claude, context, undefined, selected, identity).request.contents, result.request.contents);
+	}
+});
+
+test("Claude replay joins multiple thinking deltas only until each signature", () => {
+	const claude = { ...model, id: "claude-opus-5-5" };
+	const selected = { ...route, runtimeId: "claude-opus-5-5-low" };
+	const context = deepFreeze(normalizeContext({ messages: [user(), assistant([
+		{ type: "thinking", thinking: "" },
+		{ type: "thinking", thinking: "first " },
+		{ type: "thinking", thinking: "block", thinkingSignature: "Zmlyc3Q=" },
+		{ type: "thinking", thinking: "second" },
+		{ type: "thinking", thinking: "", thinkingSignature: "c2Vjb25k" },
+		{ type: "toolCall", id: "call", name: "read", arguments: {} },
+	], claude)] }));
+	const result = buildRequest(claude, context, undefined, selected, identity);
+	assert.deepEqual(result.request.contents[1]!.parts!.slice(0, 2), [
+		{ thought: true, text: "first block", thoughtSignature: "Zmlyc3Q=" },
+		{ thought: true, text: "second", thoughtSignature: "c2Vjb25k" },
+	]);
+	assert.equal(result.request.contents[1]!.parts![2]!.functionCall!.id, "call");
+});
+
+test("Claude history repair does not cross boundaries, overwrite signatures or alter other models", () => {
+	const claude = { ...model, id: "claude-opus-5-5" };
+	const selected = { ...route, runtimeId: "claude-opus-5-5-low" };
+	const tail = { type: "thinking" as const, thinking: "", thinkingSignature: "dGFpbA==" };
+	for (const blocks of [
+		[tail],
+		[{ type: "thinking" as const, thinking: "signed", thinkingSignature: "Zmlyc3Q=" }, tail],
+		[{ type: "thinking" as const, thinking: "unsigned" }, { type: "text" as const, text: "boundary" }, tail],
+		[{ type: "thinking" as const, thinking: "unsigned" }, { type: "toolCall" as const, name: "read", id: "call", arguments: {} }, tail],
+	]) {
+		const context = deepFreeze(normalizeContext({ messages: [user(), assistant(blocks, claude)] }));
+		assert.deepEqual(buildRequest(claude, context, undefined, selected, identity).request.contents,
+			convertMessages(claude as Model<"google-generative-ai">, context));
+	}
+	for (const source of [model, { ...claude, provider: "foreign" }, { ...claude, id: "claude-sonnet-5-5" }, { ...claude, api: "foreign-api" }]) {
+		const context = deepFreeze(normalizeContext({ messages: [user(), assistant([
+			{ type: "thinking", thinking: "Foreign reasoning" }, tail,
+		], source)] }));
+		assert.deepEqual(buildRequest(claude, context, undefined, selected, identity).request.contents,
+			convertMessages(claude as Model<"google-generative-ai">, context));
+	}
+	const gemini = deepFreeze(normalizeContext({ messages: [user(), assistant([
+		{ type: "thinking", thinking: "Gemini reasoning" }, tail,
+	])] }));
+	assert.deepEqual(buildRequest(model, gemini, undefined, route, identity).request.contents,
+		convertMessages(model as Model<"google-generative-ai">, gemini));
+});
+
 test("multiple tool calls keep separate arguments, signatures and response IDs", () => {
 	const context = normalizeContext({ messages: [
 		user(),
